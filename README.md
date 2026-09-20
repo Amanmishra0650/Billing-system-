@@ -25,3 +25,20 @@ Open `http://localhost:3000`. Setup creates one staff account only and refuses t
 Run behind HTTPS on a private server. Set `COOKIE_SECURE=1` for HTTPS and use a reverse proxy with access controls. Do not expose a plain HTTP deployment containing patient information. Restrict filesystem access to `data/`, keep encrypted off-site backups, and define staff access and retention policies before production use. No real patient details are included in source code.
 
 No external packages, subscriptions, or cloud service are required to run it. It has no payment gateway, SMS, multi-user roles, or accounting integration.
+
+## Payments and corrections
+
+Open an invoice from history to record later payments. The invoice lists every later payment and the current balance. An overpayment is rejected. An unpaid invoice can be voided with a reason and remains searchable with its original number. A paid invoice cannot be voided in this version; handle any refund and accounting correction under the clinic's approved procedure before issuing a replacement.
+
+## Backups and restore
+
+Run `npm run backup -- /secure/backup/directory` on a schedule. It creates a consistent SQLite snapshot; store copies outside the application server and limit access to authorized staff. Test restoration on a separate machine: stop the application, copy a backup to `data/billing.sqlite`, then start the application and verify an old invoice. Never commit the database or backups to GitHub.
+
+## Production checklist
+
+1. Confirm the clinic's exact legal name, address, GSTIN, tax treatment, footer statement, and invoice numbering policy with the owner and accountant. The default 2.5% + 2.5% is copied from the reference image, not an independent determination of the correct rate for every treatment.
+2. Deploy on a private Node.js 24+ server behind an HTTPS reverse proxy. Restrict server access; point the proxy to `127.0.0.1:3000`, set `COOKIE_SECURE=1`, and run as an unprivileged service user.
+3. Run `npm run setup -- admin "long-unique-secret"` on the server once. Do not put the password into version control or a shared terminal transcript. Restrict the `data/` directory and establish backup/restore and access procedures.
+4. Check a sample invoice on desktop and mobile, print to A4 PDF, and obtain the owner's acceptance before using real patient data.
+
+This code is ready for deployment, but deployment, accountant approval, and owner acceptance require the clinic's hosting details and decisions. The repository is public; it contains no real patient database.
