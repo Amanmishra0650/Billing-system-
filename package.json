@@ -1,1 +1,14 @@
-{"name":"yogi-patient-billing","version":"1.0.0","private":true,"type":"module","engines":{"node":">=24"},"scripts":{"start":"node server.mjs","setup":"node setup.mjs","test":"node --test"}}
+{
+  "name": "yogi-patient-billing",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "setup": "node setup.mjs",
+    "backup": "node backup.mjs"
+  }
+}
