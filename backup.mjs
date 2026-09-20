@@ -1,0 +1,10 @@
+import { db } from './db.mjs';
+import { mkdirSync, chmodSync } from 'node:fs';
+import { resolve } from 'node:path';
+const directory=resolve(process.argv[2]||'backups');
+mkdirSync(directory,{recursive:true,mode:0o700});
+const filename=`yogi-billing-${new Date().toISOString().replace(/[:.]/g,'-')}.sqlite`;
+const target=resolve(directory,filename);
+db.prepare('VACUUM INTO ?').run(target);
+chmodSync(target,0o600);
+console.log(`Backup saved to ${target}. Copy it to secure storage outside this server.`);
