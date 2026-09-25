@@ -17,6 +17,7 @@ Open `http://localhost:3000`. Setup creates one staff account only and refuses t
 
 - Each invoice receives a sequential `YPC-000001` style number and the server timestamp. The registration/UID is separate.
 - Add descriptions and amounts in rupees. The server stores integer paise, calculates CGST and SGST separately, and records received payment and balance.
+- Each line supports Medicine, Treatment, or Service, with a name, quantity and unit price. The line amount is calculated as quantity × unit price and is printed on the invoice. Older invoices remain readable as quantity 1.
 - CGST and SGST default to 2.5% each to match the supplied example. Staff can edit the rate for each invoice. Have a qualified accountant validate rates and invoice wording before issuing real tax invoices.
 - Saved invoices cannot be edited or deleted in this first version. This preserves the issued record. Corrections should use a deliberate credit note or replacement workflow in a later release.
 
