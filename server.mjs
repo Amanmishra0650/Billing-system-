@@ -2,6 +2,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { randomBytes, createHash, scryptSync, timingSafeEqual } from 'node:crypto';
 import { db } from './db.mjs';
+import { normalizeItems } from './items.mjs';
 
 const port = Number(process.env.PORT || 3000);
 const limit = 64 * 1024;
@@ -25,8 +26,7 @@ function invoice(input) {
  const patient_name=text(input.patient_name,100), registration=text(input.registration,60);
  if (!patient_name) throw new Error('Patient name is required');
  if (!Array.isArray(input.items) || !input.items.length || input.items.length>30) throw new Error('Add 1 to 30 charges');
- const items=input.items.map(item=>({description:text(item.description,140),amount_paise:Number(item.amount_paise)}));
- if(items.some(x=>!x.description || !Number.isSafeInteger(x.amount_paise) || x.amount_paise<0 || x.amount_paise>100000000)) throw new Error('Enter valid charge descriptions and amounts');
+ const items=normalizeItems(input.items);
  const rate=Number(input.tax_rate_bps);
  if(!Number.isSafeInteger(rate)||rate<0||rate>5000) throw new Error('Enter a valid tax rate');
  const subtotal=items.reduce((sum,x)=>sum+x.amount_paise,0);
