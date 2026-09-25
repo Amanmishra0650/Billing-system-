@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node server.mjs",
     "setup": "node setup.mjs",
-    "backup": "node backup.mjs"
+    "backup": "node backup.mjs",
+    "test": "node --test"
   }
 }
