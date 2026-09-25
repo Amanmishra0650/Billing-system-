@@ -21,7 +21,18 @@ async function api(path, opts = {}) {
   if (!r.ok) throw Error(d.error || "Request failed");
   return d;
 }
+async function fillRegistration() {
+  const field = $("registration");
+  try {
+    const data = await api("/api/registration-preview");
+    field.value = data.registration;
+  } catch {
+    field.value = "";
+    field.placeholder = "Generated when saved";
+  }
+}
 function view(name) {
+  if (name === "editor") fillRegistration();
   for (const n of ["editor", "history", "detail"]) $(n).hidden = n !== name;
   $("new-tab").classList.toggle("active", name === "editor");
   $("history-tab").classList.toggle("active", name !== "editor");
@@ -53,7 +64,7 @@ function update() {
     row.querySelector(".line-total strong").textContent = fmt(amount);
     subtotal += amount;
   });
-  const rate = Number($("tax-rate").value) || 0;
+  const rate = 9;
   const tax = Math.round((subtotal * rate) / 100);
   const total = subtotal + tax * 2;
   for (const [id, value] of Object.entries({
@@ -61,13 +72,10 @@ function update() {
     cgst: tax,
     sgst: tax,
     total,
-    balance: Math.max(0, total - rupees($("paid").value)),
   }))
     $(id).textContent = fmt(value);
 }
 $("add-item").onclick = () => itemRow();
-$("tax-rate").oninput = update;
-$("paid").oninput = update;
 itemRow();
 update();
 $("login-form").onsubmit = async (e) => {
@@ -80,6 +88,7 @@ $("login-form").onsubmit = async (e) => {
     });
     $("login").hidden = true;
     $("workspace").hidden = false;
+    fillRegistration();
   } catch (err) {
     $("login-error").textContent = err.message;
   }
@@ -101,12 +110,10 @@ $("invoice-form").onsubmit = async (e) => {
   }));
   const payload = {
     patient_name: fd.get("patient_name"),
-    registration: fd.get("registration"),
     age: fd.get("age"),
     gender: fd.get("gender"),
     payment_mode: fd.get("payment_mode"),
-    tax_rate_bps: Math.round(Number(fd.get("tax_rate")) * 100),
-    paid_paise: rupees(fd.get("paid")),
+    paid_paise: 0,
     items,
   };
   try {
@@ -119,10 +126,16 @@ $("invoice-form").onsubmit = async (e) => {
     itemRow();
     update();
     showInvoice(saved);
+    fillRegistration();
   } catch (err) {
     $("form-message").textContent = err.message;
   }
 };
+function paymentStatusControl(r) {
+  if (r.voided_at) return '<span class="pill">Voided</span>';
+  const status = r.received_paise >= r.total_paise ? 'paid' : r.received_paise > 0 ? 'partial' : 'unpaid';
+  return `<select class="payment-status" data-id="${r.id}" data-current="${status}" aria-label="Payment status for ${esc(r.invoice_number)}"><option value="unpaid" ${status === 'unpaid' ? 'selected' : ''}>Unpaid</option>${status === 'partial' ? '<option value="partial" selected disabled>Partial</option>' : ''}<option value="paid" ${status === 'paid' ? 'selected' : ''}>Paid</option></select>`;
+}
 async function list() {
   try {
     const records = await api(
@@ -131,10 +144,29 @@ async function list() {
     $("rows").innerHTML = records
       .map(
         (r) =>
-          `<tr><td><strong>${esc(r.invoice_number)}</strong></td><td>${esc(r.patient_name)}<small>${esc(r.registration)}</small></td><td>${new Date(r.created_at).toLocaleDateString("en-IN")}</td><td>${fmt(r.total_paise)}</td><td><span class="pill">${r.voided_at ? "Voided" : r.received_paise >= r.total_paise ? "Paid" : r.received_paise ? "Partial" : "Unpaid"}</span></td><td><button class="open" data-id="${r.id}">Open →</button></td></tr>`,
+          `<tr><td><strong>${esc(r.invoice_number)}</strong></td><td>${esc(r.patient_name)}<small>${esc(r.registration)}</small></td><td>${new Date(r.created_at).toLocaleDateString("en-IN")}</td><td>${fmt(r.total_paise)}</td><td>${paymentStatusControl(r)}</td><td><button class="open" data-id="${r.id}">Open →</button></td></tr>`,
       )
       .join("");
+    $("history-empty").textContent = "No invoices found.";
     $("history-empty").hidden = !!records.length;
+    document.querySelectorAll(".payment-status").forEach(select => {
+      select.onchange = async () => {
+        const status = select.value;
+        const message = status === "paid"
+          ? "Mark this invoice Paid and set the received amount to the full invoice total?"
+          : "Mark this invoice Unpaid and reset the received amount to zero? Previous payment records will be preserved.";
+        if (!confirm(message)) { select.value = select.dataset.current; return; }
+        select.disabled = true;
+        try {
+          await api(`/api/invoices/${select.dataset.id}/payment-status`, { method: "POST", body: JSON.stringify({ status }) });
+          await list();
+        } catch (error) {
+          select.value = select.dataset.current;
+          $("history-empty").textContent = error.message;
+          $("history-empty").hidden = false;
+        } finally { select.disabled = false; }
+      };
+    });
     document
       .querySelectorAll(".open")
       .forEach(
@@ -221,44 +253,6 @@ function words(n) {
     (n % 10000000 ? " " + words(n % 10000000) : "")
   );
 }
-let currentInvoice = null;
-$("payment-form").onsubmit = async (e) => {
-  e.preventDefault();
-  $("detail-error").textContent = "";
-  const fd = new FormData(e.target);
-  try {
-    const v = await api(`/api/invoices/${currentInvoice.id}/payments`, {
-      method: "POST",
-      body: JSON.stringify({
-        amount_paise: rupees(fd.get("amount")),
-        mode: fd.get("mode"),
-        note: fd.get("note"),
-      }),
-    });
-    e.target.reset();
-    showInvoice(v);
-  } catch (err) {
-    $("detail-error").textContent = err.message;
-  }
-};
-$("void-button").onclick = async () => {
-  const reason = prompt(
-    "Reason for voiding this unpaid invoice (at least 5 characters):",
-  );
-  if (reason === null) return;
-  if (!confirm("Void this invoice? Its number will remain in the history."))
-    return;
-  try {
-    showInvoice(
-      await api(`/api/invoices/${currentInvoice.id}/void`, {
-        method: "POST",
-        body: JSON.stringify({ reason }),
-      }),
-    );
-  } catch (err) {
-    $("detail-error").textContent = err.message;
-  }
-};
 function showInvoice(v) {
   v.items = v.items.map((x) => ({
     type: x.type || "Treatment",
@@ -267,11 +261,6 @@ function showInvoice(v) {
     unit_price_paise: x.unit_price_paise ?? x.amount_paise,
     amount_paise: x.amount_paise,
   }));
-  currentInvoice = v;
-  $("detail-error").textContent = "";
-  $("invoice-controls").hidden = !!v.voided_at;
-  $("payment-form").hidden = v.balance_paise <= 0;
-  $("void-button").hidden = v.received_paise > 0;
   const status = v.voided_at
     ? "VOIDED"
     : v.received_paise >= v.total_paise
@@ -291,7 +280,7 @@ function showInvoice(v) {
     hour12: true,
   });
   $("invoice-paper").innerHTML =
-    `<div class="invoice-heading"><div><h2>YOGI PILES</h2><strong>& Panchkarma Center</strong><p>Munshipuliya, Lucknow, Uttar Pradesh<br>Contact: +91 9453272173, +91 5223649819</p></div><div class="invoice-right"><h2>TAX INVOICE</h2><span class="gst">GSTIN: 09AINPR4695R1ZU</span><p>${esc(v.invoice_number)}</p></div></div>${v.voided_at ? `<div class="void-banner">VOIDED · ${esc(v.void_reason)}</div>` : ""}<div class="patient-box"><div><span>Patient Name</span><b>${esc(v.patient_name)}</b><span>Age / Gender</span><b>${esc(v.age || "—")} Years / ${esc(v.gender || "—")}</b><span>Mode of Payment</span><b>${esc(v.payment_mode)}</b></div><div><span>Reg. No. / UID</span><b>${esc(v.registration || "—")}</b><span>Date & Time</span><b>${esc(date)}</b><span>Status</span><b class="status">${status}</b></div></div><table class="bill-table"><thead><tr><th>S.NO.</th><th>TYPE</th><th>MEDICINE / SERVICE NAME</th><th>QTY</th><th>UNIT PRICE</th><th>AMOUNT</th></tr></thead><tbody>${v.items.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.type)}</td><td>${esc(x.description)}</td><td>${x.quantity}</td><td>${fmt(x.unit_price_paise)}</td><td>${fmt(x.amount_paise)}</td></tr>`).join("")}</tbody></table><div class="bill-bottom"><div class="words"><strong>AMOUNT IN WORDS</strong><br>${words(whole) || "Zero"} Indian Rupees${paise ? " and " + words(paise) + " Paise" : ""} Only</div><div class="bill-totals"><div><span>Subtotal:</span><b>${fmt(v.subtotal_paise)}</b></div><div><span>CGST (${(v.tax_rate_bps / 100).toFixed(2)}%):</span><b>${fmt(v.cgst_paise)}</b></div><div><span>SGST (${(v.tax_rate_bps / 100).toFixed(2)}%):</span><b>${fmt(v.sgst_paise)}</b></div><div class="final"><span>Grand Total:</span><b>${fmt(v.total_paise)}</b></div><div><span>Amount Received:</span><b>${fmt(v.received_paise)}</b></div><div><span>Balance Due:</span><b>${fmt(v.balance_paise)}</b></div></div></div>${v.payments.length ? `<div class="payment-history"><strong>PAYMENTS RECEIVED AFTER ISSUE</strong>${v.payments.map((p) => `<div>${esc(new Date(p.received_at).toLocaleDateString("en-IN"))} · ${esc(p.mode)} · ${fmt(p.amount_paise)} ${p.note ? "· " + esc(p.note) : ""}</div>`).join("")}</div>` : ""}<div class="signatures"><div>Patient / Attendant Signature</div><div>Authorized Signatory / Cashier</div></div><div class="bill-note">* This is a computerized tax invoice and does not require a physical signature. Thank you for choosing Yogi Piles & Panchkarma Center. Wishing you a speedy recovery.</div><div class="bill-footer"><span>Yogi Piles & Panchkarma Center · Computerized Tax Invoice</span><span>Page 1 of 1</span></div>`;
+    `<div class="invoice-heading"><div><img class="invoice-logo" src="/logo.png" alt="Yogi Piles &amp; Panchkarma Center" width="80" height="80"><h2>YOGI PILES</h2><strong>& Panchkarma Center</strong><p>Munshipuliya, Lucknow, Uttar Pradesh<br>Contact: +91 9453272173, +91 5223649819</p></div><div class="invoice-right"><h2>TAX INVOICE</h2><span class="gst">GSTIN: 09AINPR4695R1ZU</span><p>${esc(v.invoice_number)}</p></div></div>${v.voided_at ? `<div class="void-banner">VOIDED · ${esc(v.void_reason)}</div>` : ""}<div class="patient-box"><div><span>Patient Name</span><b>${esc(v.patient_name)}</b><span>Age / Gender</span><b>${esc(v.age || "—")} Years / ${esc(v.gender || "—")}</b><span>Mode of Payment</span><b>${esc(v.payment_mode)}</b></div><div><span>Reg. No. / UID</span><b>${esc(v.registration || "—")}</b><span>Date & Time</span><b>${esc(date)}</b><span>Status</span><b class="status">${status}</b></div></div><table class="bill-table"><thead><tr><th>S.NO.</th><th>TYPE</th><th>MEDICINE / SERVICE NAME</th><th>QTY</th><th>UNIT PRICE</th><th>AMOUNT</th></tr></thead><tbody>${v.items.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.type)}</td><td>${esc(x.description)}</td><td>${x.quantity}</td><td>${fmt(x.unit_price_paise)}</td><td>${fmt(x.amount_paise)}</td></tr>`).join("")}</tbody></table><div class="bill-bottom"><div class="words"><strong>AMOUNT IN WORDS</strong><br>${words(whole) || "Zero"} Indian Rupees${paise ? " and " + words(paise) + " Paise" : ""} Only</div><div class="bill-totals"><div><span>Subtotal:</span><b>${fmt(v.subtotal_paise)}</b></div><div><span>CGST (${(v.tax_rate_bps / 100).toFixed(2)}%):</span><b>${fmt(v.cgst_paise)}</b></div><div><span>SGST (${(v.tax_rate_bps / 100).toFixed(2)}%):</span><b>${fmt(v.sgst_paise)}</b></div><div class="final"><span>Grand Total:</span><b>${fmt(v.total_paise)}</b></div><div><span>Amount Received:</span><b>${fmt(v.received_paise)}</b></div><div><span>Balance Due:</span><b>${fmt(v.balance_paise)}</b></div></div></div>${v.payments.length ? `<div class="payment-history"><strong>PAYMENTS RECEIVED AFTER ISSUE</strong>${v.payments.map((p) => `<div>${esc(new Date(p.received_at).toLocaleDateString("en-IN"))} · ${esc(p.mode)} · ${fmt(p.amount_paise)} ${p.note ? "· " + esc(p.note) : ""}</div>`).join("")}</div>` : ""}${v.payment_adjustments?.length ? `<div class="payment-history"><strong>MANUAL PAYMENT STATUS ADJUSTMENTS</strong>${v.payment_adjustments.map(p => `<div>${esc(new Date(p.created_at).toLocaleString("en-IN"))} &middot; Marked ${esc(p.status)} &middot; Adjustment: ${fmt(p.amount_paise)}</div>`).join("")}</div>` : ""}<div class="signatures"><div>Patient / Attendant Signature</div><div>Authorized Signatory / Cashier</div></div><div class="bill-note">* This is a computerized tax invoice and does not require a physical signature. Thank you for choosing Yogi Piles & Panchkarma Center. Wishing you a speedy recovery.</div><div class="bill-footer"><span>Yogi Piles & Panchkarma Center · Computerized Tax Invoice</span><span>Page 1 of 1</span></div>`;
   view("detail");
   window.scrollTo(0, 0);
 }
@@ -299,5 +288,6 @@ api("/api/me")
   .then(() => {
     $("login").hidden = true;
     $("workspace").hidden = false;
+    fillRegistration();
   })
   .catch(() => {});

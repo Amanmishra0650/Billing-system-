@@ -27,8 +27,7 @@ function invoice(input) {
  if (!patient_name) throw new Error('Patient name is required');
  if (!Array.isArray(input.items) || !input.items.length || input.items.length>30) throw new Error('Add 1 to 30 charges');
  const items=normalizeItems(input.items);
- const rate=Number(input.tax_rate_bps);
- if(!Number.isSafeInteger(rate)||rate<0||rate>5000) throw new Error('Enter a valid tax rate');
+ const rate=900;
  const subtotal=items.reduce((sum,x)=>sum+x.amount_paise,0);
  const cgst=Math.round(subtotal*rate/10000), sgst=Math.round(subtotal*rate/10000);
  const total=subtotal+cgst+sgst;
@@ -43,8 +42,9 @@ function invoice(input) {
 const parse = row => {
  if (!row) return null;
  const payments=db.prepare('SELECT id,amount_paise,mode,received_at,note FROM payments WHERE invoice_id=? ORDER BY id').all(row.id);
- const paid=row.paid_paise+payments.reduce((sum,p)=>sum+p.amount_paise,0);
- return {...row,items:JSON.parse(row.items_json),payments,received_paise:paid,balance_paise:row.total_paise-paid};
+ const payment_adjustments=db.prepare('SELECT * FROM payment_adjustments WHERE invoice_id=? ORDER BY id').all(row.id);
+ const paid=row.paid_paise+payments.reduce((sum,p)=>sum+p.amount_paise,0)+payment_adjustments.reduce((sum,p)=>sum+p.amount_paise,0);
+ return {...row,items:JSON.parse(row.items_json),payments,payment_adjustments,received_paise:paid,balance_paise:row.total_paise-paid};
 };
 const server=http.createServer(async(req,res)=>{
  try {
@@ -74,6 +74,10 @@ const server=http.createServer(async(req,res)=>{
   if(url.pathname.startsWith('/api/')) {
    if(!auth(req)) return fail(res,401,'Please sign in');
    if(req.method==='GET' && url.pathname==='/api/me') return json(res,200,{authenticated:true});
+   if(req.method==='GET' && url.pathname==='/api/registration-preview') {
+    const next=Number(db.prepare("SELECT seq FROM sqlite_sequence WHERE name='invoices'").get()?.seq || 0)+1;
+    return json(res,200,{registration:`YPC-UID-${String(next).padStart(6,'0')}`});
+   }
    if(req.method==='POST' && url.pathname==='/api/logout') {
     const token=req.headers.cookie?.match(/yogi_session=([a-f0-9]{64})/)?.[1];
     if(token) db.prepare('DELETE FROM sessions WHERE token_hash=?').run(hashToken(token));
@@ -84,7 +88,7 @@ const server=http.createServer(async(req,res)=>{
     const value=invoice(await body(req));
     const row=db.prepare(`INSERT INTO invoices (created_at,patient_name,age,gender,registration,payment_mode,paid_paise,tax_rate_bps,subtotal_paise,cgst_paise,sgst_paise,total_paise,items_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(new Date().toISOString(),value.patient_name,value.age,value.gender,value.registration,value.payment_mode,value.paid_paise,value.tax_rate_bps,value.subtotal_paise,value.cgst_paise,value.sgst_paise,value.total_paise,JSON.stringify(value.items));
     const id=Number(row.lastInsertRowid), num=`YPC-${String(id).padStart(6,'0')}`;
-    db.prepare('UPDATE invoices SET invoice_number=? WHERE id=?').run(num,id);
+    db.prepare('UPDATE invoices SET invoice_number=?,registration=? WHERE id=?').run(num,`YPC-UID-${String(id).padStart(6,'0')}`,id);
     db.prepare('INSERT INTO audit_log (invoice_id,action,details,created_at) VALUES (?,?,?,?)').run(id,'created','Invoice issued',new Date().toISOString());
     return json(res,201,parse(db.prepare('SELECT * FROM invoices WHERE id=?').get(id)));
    }
@@ -94,6 +98,28 @@ const server=http.createServer(async(req,res)=>{
     return json(res,200,rows.map(row=>{const v=parse(row);return {id:v.id,invoice_number:v.invoice_number,created_at:v.created_at,patient_name:v.patient_name,registration:v.registration,total_paise:v.total_paise,received_paise:v.received_paise,voided_at:v.voided_at};}));
    }
    const match=url.pathname.match(/^\/api\/invoices\/(\d+)$/);
+   const statusMatch=url.pathname.match(/^\/api\/invoices\/(\d+)\/payment-status$/);
+   if(req.method==='POST' && statusMatch) {
+    const id=Number(statusMatch[1]), data=await body(req);
+    if(!['paid','unpaid'].includes(data.status)) return fail(res,400,'Choose Paid or Unpaid');
+    const row=db.prepare('SELECT * FROM invoices WHERE id=?').get(id);
+    if(!row) return fail(res,404,'Invoice not found');
+    if(row.voided_at) return fail(res,409,'Voided invoices cannot change payment status');
+    if(row.total_paise===0 && data.status==='unpaid') return fail(res,400,'A zero-total invoice has no amount due');
+    db.exec('BEGIN IMMEDIATE');
+    try {
+     const current=parse(db.prepare('SELECT * FROM invoices WHERE id=?').get(id));
+     const target=data.status==='paid'?current.total_paise:0;
+     const adjustment=target-current.received_paise;
+     if(adjustment!==0) {
+      const now=new Date().toISOString();
+      db.prepare('INSERT INTO payment_adjustments (invoice_id,amount_paise,status,created_at) VALUES (?,?,?,?)').run(id,adjustment,data.status,now);
+      db.prepare('INSERT INTO audit_log (invoice_id,action,details,created_at) VALUES (?,?,?,?)').run(id,'payment_status',JSON.stringify({status:data.status,previous_received_paise:current.received_paise,received_paise:target,adjustment_paise:adjustment}),now);
+     }
+     db.exec('COMMIT');
+    } catch(e) { db.exec('ROLLBACK'); throw e; }
+    return json(res,200,parse(db.prepare('SELECT * FROM invoices WHERE id=?').get(id)));
+   }
    const payment=url.pathname.match(/^\/api\/invoices\/(\d+)\/payments$/);
    if(req.method==='POST' && payment) {
     const id=Number(payment[1]), data=await body(req), row=db.prepare('SELECT * FROM invoices WHERE id=?').get(id);
@@ -132,8 +158,8 @@ const server=http.createServer(async(req,res)=>{
    return fail(res,404,'Not found');
   }
   const path=url.pathname==='/'?'/index.html':url.pathname;
-  if(!['/index.html','/app.js','/styles.css'].includes(path) || req.method!=='GET') return fail(res,404,'Not found');
-  const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'};
+  if(!['/index.html','/app.js','/styles.css','/logo.png'].includes(path) || req.method!=='GET') return fail(res,404,'Not found');
+  const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png'};
   const content=await readFile(new URL(`./public${path}`,import.meta.url));
   res.writeHead(200,{'Content-Type':types[path.slice(path.lastIndexOf('.'))],'X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"}); res.end(content);
  } catch(e) { console.error(e); fail(res,e.status||400,e.status===413?'Request too large':e.message||'Request failed'); }

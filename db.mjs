@@ -16,6 +16,11 @@ CREATE TABLE IF NOT EXISTS invoices (
 CREATE TABLE IF NOT EXISTS payments (id INTEGER PRIMARY KEY AUTOINCREMENT, invoice_id INTEGER NOT NULL REFERENCES invoices(id), amount_paise INTEGER NOT NULL CHECK(amount_paise > 0), mode TEXT NOT NULL, received_at TEXT NOT NULL, note TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, invoice_id INTEGER NOT NULL, action TEXT NOT NULL, details TEXT NOT NULL, created_at TEXT NOT NULL);`);
 const columns = db.prepare('PRAGMA table_info(invoices)').all().map(x=>x.name);
+db.exec(`CREATE TABLE IF NOT EXISTS payment_adjustments (
+ id INTEGER PRIMARY KEY, invoice_id INTEGER NOT NULL REFERENCES invoices(id),
+ amount_paise INTEGER NOT NULL, status TEXT NOT NULL CHECK(status IN ('paid','unpaid')),
+ created_at TEXT NOT NULL
+);`);
 if (!columns.includes('voided_at')) db.exec('ALTER TABLE invoices ADD COLUMN voided_at TEXT');
 if (!columns.includes('void_reason')) db.exec('ALTER TABLE invoices ADD COLUMN void_reason TEXT');
 // Existing invoices already recorded the initial amount received in this field.
