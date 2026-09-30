@@ -53,3 +53,30 @@ textarea{font:inherit;display:block;resize:vertical;width:100%;min-height:80px;m
 @media(max-width:850px){.workspace-navigation{padding:0 16px}.visit-detail-grid{grid-template-columns:1fr}.topbar{gap:12px}.topbar nav{gap:20px}}
 @media(max-width:520px){.visit-heading{align-items:start;flex-direction:column}.linked-invoice{align-items:start;flex-direction:column}.detail-list{grid-template-columns:110px 1fr;gap:12px}.workspace-navigation nav{gap:22px}.subnav{font-size:13px}.desk-badge{display:none}#opd-history .page-head{align-items:start;flex-direction:column}#opd-form .actions{align-items:start;flex-direction:column}.context-notice{align-items:start;flex-direction:column}.patient-lookup{padding:14px}.topbar .brand strong{font-size:11px}.topbar nav{gap:12px}.topbar .nav{font-size:14px}}
 @media print{.workspace-navigation,#opd-editor,#opd-history,#opd-detail,#invoice-opd-notice{display:none!important}}
+#opd-paper{display:none}.opd-consultation{margin:20px 0;overflow-wrap:anywhere}
+@media print{
+  body:has(#opd-detail:not([hidden])) #detail{display:none!important}
+  #opd-detail:not([hidden]){display:block!important}
+  #opd-detail-content,#opd-detail-error{display:none!important}
+  #opd-detail:not([hidden]) #opd-paper{display:block}
+  #opd-paper .patient-box b{overflow-wrap:anywhere}
+}
+/* OPD print layout follows the outpatient visit record reference. */
+#opd-paper .patient-box,#opd-paper .words,#opd-paper .gst,#opd-paper .bill-totals .final{background:white}
+#opd-paper .patient-box{margin-bottom:0}
+#opd-paper .opd-address{display:grid;grid-template-columns:120px 1fr;gap:10px;padding:12px 14px;border:1px solid var(--line);border-top:0;border-radius:0 0 4px 4px;break-inside:avoid}
+#opd-paper .opd-address span,#opd-paper .opd-consultation dt,#opd-paper .opd-payment{color:#526459}
+#opd-paper .opd-address b{overflow-wrap:anywhere}
+#opd-paper .opd-consultation{margin:18px 0 22px;break-inside:avoid}
+#opd-paper .opd-consultation h3{font-size:12px;letter-spacing:.05em;color:#194d33;border-bottom:1px solid var(--line);padding-bottom:8px;margin:0 0 10px}
+#opd-paper .opd-consultation dl{display:grid;grid-template-columns:150px 1fr;gap:8px;margin:0}
+#opd-paper .opd-consultation dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+#opd-paper .bill-table th{background:white;color:#194d33}
+#opd-paper .bill-table th:first-child,#opd-paper .bill-table td:first-child{width:9%;text-align:center}
+#opd-paper .bill-table th:nth-child(2),#opd-paper .bill-table td:nth-child(2){width:57%;text-align:left;font-weight:400}
+#opd-paper .bill-table th:nth-child(2){font-weight:700}
+#opd-paper .bill-table th:last-child,#opd-paper .bill-table td:last-child{text-align:right}
+#opd-paper .opd-payment{font-size:12px;margin-top:16px}
+#opd-paper .opd-payment b{color:#20392d}
+#opd-paper .bill-bottom>div:first-child{min-width:0}
+@media print{body:has(#opd-detail:not([hidden])){background:white}#opd-paper .opd-address{font-size:9pt}#opd-paper .opd-consultation{font-size:10pt}#opd-paper .signatures{margin-top:38px}}

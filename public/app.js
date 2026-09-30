@@ -281,21 +281,6 @@ function words(n) {
   );
 }
 function showInvoice(v) {
-  let controls=$('invoice-controls');
-  if(!controls) { controls=document.createElement('div');controls.id='invoice-controls';controls.className='invoice-controls panel';$('detail').insertBefore(controls,$('invoice-paper')); }
-  controls.hidden=!!v.voided_at;
-  controls.innerHTML=`<div><h2>Record a payment</h2><p>Balance due: <strong>${fmt(v.balance_paise)}</strong></p>${v.balance_paise>0?`<form id="later-payment"><label>Payment amount (₹)<input name="amount" type="number" min="0.01" max="${v.balance_paise/100}" step="0.01" required></label><label>Payment mode<select name="mode"><option>CASH</option><option>UPI</option><option>CARD</option><option>BANK TRANSFER</option><option>OTHER</option></select></label><label>Payment note<input name="note" maxlength="200" placeholder="Optional"></label><button class="primary" type="submit">Record payment</button></form>`:'<span class="pill">Fully paid</span>'}</div><div class="void-control"><h2>Invoice correction</h2>${v.received_paise===0?'<p>An unpaid invoice can be voided. The original record stays in history.</p><form id="void-invoice"><label>Reason for voiding<input name="reason" minlength="5" maxlength="200" required></label><button class="subtle" type="submit">Void invoice</button></form>':'<p>This invoice has payments. Refunds must be handled outside this app before voiding.</p>'}</div><div id="detail-error" role="alert"></div>`;
-  if($('later-payment')) $('later-payment').onsubmit=async event=>{
-    event.preventDefault();const form=event.target,button=form.querySelector('button');button.disabled=true;$('detail-error').textContent='';
-    try {showInvoice(await api(`/api/invoices/${v.id}/payments`,{method:'POST',body:JSON.stringify({amount_paise:rupees(form.elements.amount.value),mode:form.elements.mode.value,note:form.elements.note.value})}));}
-    catch(error){$('detail-error').textContent=error.message;button.disabled=false;}
-  };
-  if($('void-invoice')) $('void-invoice').onsubmit=async event=>{
-    event.preventDefault();if(!confirm('Void this unpaid invoice? The original record will remain in history.'))return;
-    const button=event.target.querySelector('button');button.disabled=true;$('detail-error').textContent='';
-    try{showInvoice(await api(`/api/invoices/${v.id}/void`,{method:'POST',body:JSON.stringify({reason:event.target.elements.reason.value})}));}
-    catch(error){$('detail-error').textContent=error.message;button.disabled=false;}
-  };
   v.items = v.items.map((x) => ({
     type: x.type || "Treatment",
     description: x.description,
@@ -335,7 +320,7 @@ api("/api/me")
   })
   .catch(() => {});
 
-initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice(visit) {
+initOpd({$,api,esc,fmt,view,showInvoice,words,prepareInvoice(visit) {
   resetInvoiceEditor(); linkedVisit=visit;
   const form=$('invoice-form');
   for (const [name,value] of Object.entries({patient_name:visit.patient_name,age:visit.age,gender:visit.gender,payment_mode:visit.payment_mode||'UNPAID'})) {
