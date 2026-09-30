@@ -1,0 +1,12 @@
+import { getDatabase } from '../database.mjs';
+import { createHandler } from '../handler.mjs';
+let handler;
+export default async function api(req,res) {
+  try {
+    const url=new URL(req.url,'http://localhost');
+    const route=url.searchParams.get('route');
+    if (route !== null) { url.pathname='/api/'+route;url.searchParams.delete('route');req.url=url.pathname+url.search; }
+    handler ||= createHandler(await getDatabase()); await handler(req,res);
+  }
+  catch { res.statusCode=503;res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify({error:'Service is not configured. Contact the administrator.'})); }
+}

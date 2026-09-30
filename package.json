@@ -10,6 +10,16 @@
     "start": "node server.mjs",
     "setup": "node setup.mjs",
     "backup": "node backup.mjs",
-    "test": "node --test"
+    "migrate:sqlite": "node migrate-sqlite.mjs",
+    "restore:local": "node restore-local.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
   }
 }

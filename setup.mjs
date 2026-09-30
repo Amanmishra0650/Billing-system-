@@ -1,14 +1,12 @@
-import { scryptSync, randomBytes } from 'node:crypto';
-import { db } from './db.mjs';
-const [username, password] = process.argv.slice(2);
-if (!username || !password || password.length < 12) {
- console.error('Usage: npm run setup -- admin "a-unique-password-at-least-12-characters"');
- process.exit(1);
-}
-if (db.prepare('SELECT id FROM users LIMIT 1').get()) {
- console.error('A staff account already exists. Setup is disabled.'); process.exit(1);
-}
-const salt = randomBytes(16).toString('hex');
-const hash = scryptSync(password, salt, 64).toString('hex');
-db.prepare('INSERT INTO users (username,salt,hash) VALUES (?,?,?)').run(username,salt,hash);
-console.log('Staff account created. Start with npm start.');
+﻿import { createDatabase } from './database.mjs';
+import { seedAdmin } from './auth.mjs';
+const db=await createDatabase();
+try {
+  const username=process.argv[2]||process.env.ADMIN_USERNAME;
+  const password=process.argv[3]||process.env.ADMIN_PASSWORD;
+  if(username||password) {
+    const created=await seedAdmin(db,username,password);
+    console.log(created?'Staff account created. Start with npm start.':'Existing staff account retained. Schema and doctor seed are ready.');
+  } else console.log('Schema and doctor seed are ready. Set ADMIN_USERNAME and ADMIN_PASSWORD, then rerun setup to create the initial account.');
+} catch(error) { console.error(error.status?error.message:'Setup failed. Check database configuration.');process.exitCode=1; }
+finally { await db.close(); }

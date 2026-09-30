@@ -1,0 +1,37 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+import { mkdtemp, rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createDatabase } from '../database.mjs';
+import { migrateSqlite } from '../migration.mjs';
+import { getInvoice } from '../billing.mjs';
+import { createPatient } from '../opd-service.mjs';
+
+test('SQLite migration preserves issued records, payments and hashes, verifies totals, and refuses repeat import', async t => {
+  const dir=await mkdtemp(join(tmpdir(),'yogi-migration-')), source=join(dir,'billing.sqlite');
+  const sqlite=new DatabaseSync(source);
+  sqlite.exec(`CREATE TABLE users(id INTEGER PRIMARY KEY,username TEXT,salt TEXT,hash TEXT);
+   INSERT INTO users VALUES(1,'legacy','salt','hash');
+   CREATE TABLE invoices(id INTEGER PRIMARY KEY,invoice_number TEXT,created_at TEXT,patient_name TEXT,age TEXT,gender TEXT,registration TEXT,payment_mode TEXT,paid_paise INTEGER,tax_rate_bps INTEGER,subtotal_paise INTEGER,cgst_paise INTEGER,sgst_paise INTEGER,total_paise INTEGER,items_json TEXT,voided_at TEXT,void_reason TEXT);
+   CREATE TABLE payments(id INTEGER PRIMARY KEY,invoice_id INTEGER,amount_paise INTEGER,mode TEXT,received_at TEXT,note TEXT);
+   CREATE TABLE payment_adjustments(id INTEGER PRIMARY KEY,invoice_id INTEGER,amount_paise INTEGER,status TEXT,created_at TEXT);
+   CREATE TABLE audit_log(id INTEGER PRIMARY KEY,invoice_id INTEGER,action TEXT,details TEXT,created_at TEXT);`);
+  sqlite.prepare('INSERT INTO invoices VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(7,'YPC-000007','2026-09-01T10:00:00.000Z','Test legacy','40','Female','YPC-UID-000120','CASH',10000,900,50000,4500,4500,59000,JSON.stringify([{description:'Legacy consultation',type:'Service',amount_paise:50000}]),null,null);
+  sqlite.exec("INSERT INTO payments VALUES(3,7,10000,'UPI','2026-09-02T10:00:00.000Z','Test payment'); INSERT INTO payment_adjustments VALUES(2,7,39000,'paid','2026-09-03T10:00:00.000Z'); INSERT INTO audit_log VALUES(9,7,'created','Invoice issued','2026-09-01T10:00:00.000Z');");
+  sqlite.close();
+  const db=await createDatabase({connectionString:'',dataDir:'memory://'});
+  t.after(async()=>{await db.close();await rm(dir,{recursive:true,force:true});});
+  const report=await migrateSqlite(db,source,join(dir,'backups'));
+  assert.equal(report.counts.invoices,1); assert.equal(report.totals.total_paise,59000);
+  assert.ok((await stat(report.backup)).size>0);
+  assert.ok((await stat(source)).size>0);
+  const invoice=await getInvoice(db,7);
+  assert.equal(invoice.invoice_number,'YPC-000007');assert.equal(invoice.registration,'YPC-UID-000120');
+  assert.equal(invoice.received_paise,59000); assert.equal(invoice.items[0].quantity,1);assert.equal(invoice.payments[0].id,3);
+  assert.equal((await db.query('SELECT hash FROM users')).rows[0].hash,'hash');
+  assert.equal((await createPatient(db,{name:'New Test'})).patient_uid,'YPC-UID-000121');
+  await assert.rejects(()=>migrateSqlite(db,source,join(dir,'backups')),/empty/i);
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM invoices')).rows[0].n,1);
+});

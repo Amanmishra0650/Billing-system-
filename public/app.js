@@ -1,4 +1,6 @@
+import { initOpd } from './opd-ui.js';
 const $ = (id) => document.getElementById(id);
+let linkedVisit = null;
 const fmt = (p) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(
     p / 100,
@@ -18,14 +20,15 @@ async function api(path, opts = {}) {
     headers: { "Content-Type": "application/json", ...opts.headers },
   });
   const d = await r.json();
-  if (!r.ok) throw Error(d.error || "Request failed");
+  if (!r.ok) { const error = Error(d.error || "Request failed"); error.fields=d.fields; error.matches=d.matches; error.status=r.status; throw error; }
   return d;
 }
 async function fillRegistration() {
+  if (linkedVisit) { $("registration").value=linkedVisit.patient_uid; return; }
   const field = $("registration");
   try {
     const data = await api("/api/registration-preview");
-    field.value = data.registration;
+    if (!linkedVisit) field.value = data.registration;
   } catch {
     field.value = "";
     field.placeholder = "Generated when saved";
@@ -33,9 +36,18 @@ async function fillRegistration() {
 }
 function view(name) {
   if (name === "editor") fillRegistration();
-  for (const n of ["editor", "history", "detail"]) $(n).hidden = n !== name;
+  for (const n of ["editor", "history", "detail", "opd-editor", "opd-history", "opd-detail"]) if ($(n)) $(n).hidden = n !== name;
+  const opd = name.startsWith('opd-');
+  $("billing-tab").classList.toggle('active',!opd);
+  $("opd-tab").classList.toggle('active',opd);
+  $("billing-navigation").hidden=opd;
+  $("opd-navigation").hidden=!opd;
   $("new-tab").classList.toggle("active", name === "editor");
   $("history-tab").classList.toggle("active", name !== "editor");
+  if ($('opd-new-tab')) {
+    $('opd-new-tab').classList.toggle('active',name==='opd-editor');
+    $('opd-history-tab').classList.toggle('active',name==='opd-history'||name==='opd-detail');
+  }
 }
 function itemRow(
   description = "",
@@ -74,6 +86,13 @@ function update() {
     total,
   }))
     $(id).textContent = fmt(value);
+  if ($('opd-invoice-payment')) {
+    $('opd-invoice-payment').hidden=!linkedVisit;
+    if (linkedVisit) {
+      const paid=linkedVisit.payment_status==='paid'?linkedVisit.consultation_total_paise:0;
+      $('opd-invoice-payment').textContent=`Received at OPD: ${fmt(paid)} · Balance: ${fmt(Math.max(0,total-paid))}`;
+    }
+  }
 }
 $("add-item").onclick = () => itemRow();
 itemRow();
@@ -97,6 +116,7 @@ $("logout").onclick = async () => {
   await api("/api/logout", { method: "POST" });
   $("workspace").hidden = true;
   $("login").hidden = false;
+  location.reload();
 };
 $("invoice-form").onsubmit = async (e) => {
   e.preventDefault();
@@ -116,20 +136,19 @@ $("invoice-form").onsubmit = async (e) => {
     paid_paise: 0,
     items,
   };
+  const submit=e.target.querySelector('[type=submit]');
+  submit.disabled=true;
   try {
-    const saved = await api("/api/invoices", {
+    const saved = await api(linkedVisit ? `/api/opd-visits/${linkedVisit.id}/invoice` : "/api/invoices", {
       method: "POST",
       body: JSON.stringify(payload),
     });
-    e.target.reset();
-    $("items").replaceChildren();
-    itemRow();
-    update();
+    resetInvoiceEditor();
     showInvoice(saved);
     fillRegistration();
   } catch (err) {
     $("form-message").textContent = err.message;
-  }
+  } finally { submit.disabled=false; }
 };
 function paymentStatusControl(r) {
   if (r.voided_at) return '<span class="pill">Voided</span>';
@@ -168,7 +187,7 @@ async function list() {
       };
     });
     document
-      .querySelectorAll(".open")
+      .querySelectorAll("#rows .open")
       .forEach(
         (b) =>
           (b.onclick = async () =>
@@ -184,8 +203,16 @@ $("history-tab").onclick = () => {
   view("history");
   list();
 };
-$("new-tab").onclick = () => view("editor");
-$("create-from-history").onclick = () => view("editor");
+function resetInvoiceEditor() {
+  linkedVisit=null;
+  $('invoice-form').reset();
+  for (const name of ['patient_name','age','gender','payment_mode']) $('invoice-form').elements[name].disabled=false;
+  $('invoice-opd-notice').hidden=true;
+  $('items').replaceChildren(); itemRow(); update();
+}
+$("new-tab").onclick = () => { resetInvoiceEditor(); view("editor"); };
+$("create-from-history").onclick = $("new-tab").onclick;
+$('billing-tab').onclick=()=>view('editor');
 $("back-history").onclick = () => {
   view("history");
   list();
@@ -254,6 +281,21 @@ function words(n) {
   );
 }
 function showInvoice(v) {
+  let controls=$('invoice-controls');
+  if(!controls) { controls=document.createElement('div');controls.id='invoice-controls';controls.className='invoice-controls panel';$('detail').insertBefore(controls,$('invoice-paper')); }
+  controls.hidden=!!v.voided_at;
+  controls.innerHTML=`<div><h2>Record a payment</h2><p>Balance due: <strong>${fmt(v.balance_paise)}</strong></p>${v.balance_paise>0?`<form id="later-payment"><label>Payment amount (₹)<input name="amount" type="number" min="0.01" max="${v.balance_paise/100}" step="0.01" required></label><label>Payment mode<select name="mode"><option>CASH</option><option>UPI</option><option>CARD</option><option>BANK TRANSFER</option><option>OTHER</option></select></label><label>Payment note<input name="note" maxlength="200" placeholder="Optional"></label><button class="primary" type="submit">Record payment</button></form>`:'<span class="pill">Fully paid</span>'}</div><div class="void-control"><h2>Invoice correction</h2>${v.received_paise===0?'<p>An unpaid invoice can be voided. The original record stays in history.</p><form id="void-invoice"><label>Reason for voiding<input name="reason" minlength="5" maxlength="200" required></label><button class="subtle" type="submit">Void invoice</button></form>':'<p>This invoice has payments. Refunds must be handled outside this app before voiding.</p>'}</div><div id="detail-error" role="alert"></div>`;
+  if($('later-payment')) $('later-payment').onsubmit=async event=>{
+    event.preventDefault();const form=event.target,button=form.querySelector('button');button.disabled=true;$('detail-error').textContent='';
+    try {showInvoice(await api(`/api/invoices/${v.id}/payments`,{method:'POST',body:JSON.stringify({amount_paise:rupees(form.elements.amount.value),mode:form.elements.mode.value,note:form.elements.note.value})}));}
+    catch(error){$('detail-error').textContent=error.message;button.disabled=false;}
+  };
+  if($('void-invoice')) $('void-invoice').onsubmit=async event=>{
+    event.preventDefault();if(!confirm('Void this unpaid invoice? The original record will remain in history.'))return;
+    const button=event.target.querySelector('button');button.disabled=true;$('detail-error').textContent='';
+    try{showInvoice(await api(`/api/invoices/${v.id}/void`,{method:'POST',body:JSON.stringify({reason:event.target.elements.reason.value})}));}
+    catch(error){$('detail-error').textContent=error.message;button.disabled=false;}
+  };
   v.items = v.items.map((x) => ({
     type: x.type || "Treatment",
     description: x.description,
@@ -282,6 +324,7 @@ function showInvoice(v) {
   $("invoice-paper").innerHTML =
     `<div class="invoice-heading"><div><img class="invoice-logo" src="/logo.png" alt="Yogi Piles &amp; Panchkarma Center" width="80" height="80"><h2>YOGI PILES</h2><strong>& Panchkarma Center</strong><p>Munshipuliya, Lucknow, Uttar Pradesh<br>Contact: +91 9453272173, +91 5223649819</p></div><div class="invoice-right"><h2>TAX INVOICE</h2><span class="gst">GSTIN: 09AINPR4695R1ZU</span><p>${esc(v.invoice_number)}</p></div></div>${v.voided_at ? `<div class="void-banner">VOIDED · ${esc(v.void_reason)}</div>` : ""}<div class="patient-box"><div><span>Patient Name</span><b>${esc(v.patient_name)}</b><span>Age / Gender</span><b>${esc(v.age || "—")} Years / ${esc(v.gender || "—")}</b><span>Mode of Payment</span><b>${esc(v.payment_mode)}</b></div><div><span>Reg. No. / UID</span><b>${esc(v.registration || "—")}</b><span>Date & Time</span><b>${esc(date)}</b><span>Status</span><b class="status">${status}</b></div></div><table class="bill-table"><thead><tr><th>S.NO.</th><th>TYPE</th><th>MEDICINE / SERVICE NAME</th><th>QTY</th><th>UNIT PRICE</th><th>AMOUNT</th></tr></thead><tbody>${v.items.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.type)}</td><td>${esc(x.description)}</td><td>${x.quantity}</td><td>${fmt(x.unit_price_paise)}</td><td>${fmt(x.amount_paise)}</td></tr>`).join("")}</tbody></table><div class="bill-bottom"><div class="words"><strong>AMOUNT IN WORDS</strong><br>${words(whole) || "Zero"} Indian Rupees${paise ? " and " + words(paise) + " Paise" : ""} Only</div><div class="bill-totals"><div><span>Subtotal:</span><b>${fmt(v.subtotal_paise)}</b></div><div><span>CGST (${(v.tax_rate_bps / 100).toFixed(2)}%):</span><b>${fmt(v.cgst_paise)}</b></div><div><span>SGST (${(v.tax_rate_bps / 100).toFixed(2)}%):</span><b>${fmt(v.sgst_paise)}</b></div><div class="final"><span>Grand Total:</span><b>${fmt(v.total_paise)}</b></div><div><span>Amount Received:</span><b>${fmt(v.received_paise)}</b></div><div><span>Balance Due:</span><b>${fmt(v.balance_paise)}</b></div></div></div>${v.payments.length ? `<div class="payment-history"><strong>PAYMENTS RECEIVED AFTER ISSUE</strong>${v.payments.map((p) => `<div>${esc(new Date(p.received_at).toLocaleDateString("en-IN"))} · ${esc(p.mode)} · ${fmt(p.amount_paise)} ${p.note ? "· " + esc(p.note) : ""}</div>`).join("")}</div>` : ""}${v.payment_adjustments?.length ? `<div class="payment-history"><strong>MANUAL PAYMENT STATUS ADJUSTMENTS</strong>${v.payment_adjustments.map(p => `<div>${esc(new Date(p.created_at).toLocaleString("en-IN"))} &middot; Marked ${esc(p.status)} &middot; Adjustment: ${fmt(p.amount_paise)}</div>`).join("")}</div>` : ""}<div class="signatures"><div>Patient / Attendant Signature</div><div>Authorized Signatory / Cashier</div></div><div class="bill-note">* This is a computerized tax invoice and does not require a physical signature. Thank you for choosing Yogi Piles & Panchkarma Center. Wishing you a speedy recovery.</div><div class="bill-footer"><span>Yogi Piles & Panchkarma Center · Computerized Tax Invoice</span><span>Page 1 of 1</span></div>`;
   view("detail");
+  if(v.opd_number) $('invoice-paper').querySelector('.invoice-right').insertAdjacentHTML('beforeend',`<p>OPD: ${esc(v.opd_number)}</p>`);
   window.scrollTo(0, 0);
 }
 api("/api/me")
@@ -291,3 +334,19 @@ api("/api/me")
     fillRegistration();
   })
   .catch(() => {});
+
+initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice(visit) {
+  resetInvoiceEditor(); linkedVisit=visit;
+  const form=$('invoice-form');
+  for (const [name,value] of Object.entries({patient_name:visit.patient_name,age:visit.age,gender:visit.gender,payment_mode:visit.payment_mode||'UNPAID'})) {
+    form.elements[name].value=value; form.elements[name].disabled=true;
+  }
+  $('registration').value=visit.patient_uid;
+  $('items').replaceChildren();
+  itemRow(`Consultation - ${visit.doctor_name}`,visit.consultation_fee_paise/100,1,'Service');
+  $('items').firstElementChild.classList.add('locked-charge');
+  $('items').firstElementChild.querySelectorAll('input,select,button').forEach(el=>el.disabled=true);
+  $('invoice-opd-notice').hidden=false;
+  $('invoice-opd-notice').textContent=`${visit.opd_number} · ${visit.patient_uid} · Consultation from OPD. Save invoice to issue it. Additional charges can be added below.`;
+  update(); view('editor'); window.scrollTo(0,0);
+}});
