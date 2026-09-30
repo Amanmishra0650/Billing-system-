@@ -1,4 +1,4 @@
-export function initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice}) {
+export function initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice,amountInWords}) {
   let selectedPatient=null, currentVisit=null, optionsReady=false, searchVersion=0, historyVersion=0;
   const modes='<option value="">Select payment mode</option><option>CASH</option><option>UPI</option><option>CARD</option><option>BANK TRANSFER</option><option>OTHER</option>';
   document.querySelector('main').insertAdjacentHTML('beforeend',`
@@ -22,7 +22,6 @@ export function initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice}) {
           <label>Doctor <select name="doctor_id" required><option value="">Loading doctors…</option></select></label>
           <label class="wide">Illness <select name="illness_code" required><option value="">Select illness</option></select></label>
           <label id="custom-illness-label" class="wide" hidden>Other illness <input name="custom_illness" maxlength="140" placeholder="Describe the illness"></label>
-          <label class="wide">Short note <textarea name="note" maxlength="300" rows="2" placeholder="Optional visit note"></textarea></label>
         </div>
         <div class="panel-title spaced"><span class="number">03</span><h2>Consultation &amp; payment</h2></div>
         <div class="fields">
@@ -35,7 +34,8 @@ export function initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice}) {
       <aside class="summary panel"><span class="eyebrow">VISIT SUMMARY</span><h2>Consultation total</h2><div class="sumrow"><span>Consultation fee</span><strong id="opd-subtotal">₹0.00</strong></div><div class="sumrow"><span>CGST (9%)</span><strong id="opd-cgst">₹0.00</strong></div><div class="sumrow"><span>SGST (9%)</span><strong id="opd-sgst">₹0.00</strong></div><div class="sumrow grand"><span>Total</span><strong id="opd-total">₹0.00</strong></div><div class="sumrow"><span>Amount received</span><strong id="opd-received">₹0.00</strong></div><p class="hint">Save the visit first. You can create its invoice from the visit details.</p><div class="summary-note"><strong>Returning patient?</strong><p>The patient keeps the same UID. Every visit receives its own OPD number.</p></div></aside></div>
     </section>
     <section id="opd-history" hidden><div class="page-head"><div><span class="eyebrow">PATIENT VISITS</span><h1>OPD history</h1><p>Find previous visits, consultation details and linked invoices.</p></div><button id="opd-history-new" class="primary" type="button">+ New registration</button></div><div class="panel"><label class="search-label">Search OPD visits<input id="opd-search" type="search" placeholder="Patient, UID, mobile, OPD, doctor or illness"></label><div class="table-wrap"><table><thead><tr><th>Visit</th><th>Patient</th><th>Doctor / illness</th><th>Consultation</th><th>Payment at registration</th><th></th></tr></thead><tbody id="opd-rows"></tbody></table></div><p id="opd-history-state" class="hint" role="status">No visits yet. Register a patient to get started.</p></div></section>
-    <section id="opd-detail" hidden><div class="page-head"><button id="opd-back" class="subtle" type="button">← OPD history</button><button id="opd-invoice" class="primary" type="button">Create invoice</button></div><div id="opd-detail-content"></div><p id="opd-detail-error" class="error" role="alert"></p></section>
+    <section id="opd-detail" hidden><div class="page-head"><button id="opd-back" class="subtle" type="button">← OPD history</button><div class="opd-document-actions"><button id="opd-preview" class="secondary" type="button">OPD form / PDF</button><button id="opd-invoice" class="primary" type="button">Create invoice</button></div></div><div id="opd-detail-content"></div><p id="opd-detail-error" class="error" role="alert"></p></section>
+    <section id="opd-print" hidden><div class="page-head"><button id="opd-print-back" class="subtle" type="button">Back to OPD visit</button><button id="opd-print-save" class="primary" type="button">Print / Save as PDF</button></div><div class="opd-paper-scroll"><article id="opd-paper" class="invoice-paper opd-paper" aria-label="OPD registration form"></article></div></section>
   `);
   const form=$('opd-form'), field=name=>form.elements[name];
   function localNow() { const now=new Date(); return new Date(now-now.getTimezoneOffset()*60000).toISOString().slice(0,16); }
@@ -104,7 +104,7 @@ export function initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice}) {
   form.onsubmit=async event=>{
     event.preventDefault();$('opd-form-message').textContent='';$('save-opd').disabled=true;
     form.querySelectorAll('[aria-invalid]').forEach(el=>el.removeAttribute('aria-invalid'));
-    const data={patient_id:selectedPatient?.id,patient:selectedPatient?undefined:{name:field('name').value,mobile:field('mobile').value,age:field('age').value,gender:field('gender').value,address:field('address').value,confirm_distinct_patient:$('confirm-distinct').checked},visited_at:new Date(field('visited_at').value).toISOString(),doctor_id:field('doctor_id').value,illness_code:field('illness_code').value,custom_illness:field('custom_illness').value,note:field('note').value,consultation_fee_paise:Math.round(Number(field('consultation_fee').value)*100),payment_status:field('payment_status').value,payment_mode:field('payment_mode').value};
+    const data={patient_id:selectedPatient?.id,patient:selectedPatient?undefined:{name:field('name').value,mobile:field('mobile').value,age:field('age').value,gender:field('gender').value,address:field('address').value,confirm_distinct_patient:$('confirm-distinct').checked},visited_at:new Date(field('visited_at').value).toISOString(),doctor_id:field('doctor_id').value,illness_code:field('illness_code').value,custom_illness:field('custom_illness').value,consultation_fee_paise:Math.round(Number(field('consultation_fee').value)*100),payment_status:field('payment_status').value,payment_mode:field('payment_mode').value};
     try { const visit=await api('/api/opd-visits',{method:'POST',body:JSON.stringify(data)});form.reset();clearPatient();field('visited_at').value='';field('custom_illness').required=false;$('custom-illness-label').hidden=true;showVisit(visit); }
     catch(error) {
       $('opd-form-message').textContent=error.message;
@@ -124,7 +124,7 @@ export function initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice}) {
   function showVisit(visit) {
     currentVisit=visit;const total=visit.consultation_total_paise;
     $('opd-detail-error').textContent='';
-    $('opd-detail-content').innerHTML=`<div class="visit-heading"><div><span class="eyebrow">OPD VISIT</span><h1>${esc(visit.opd_number)}</h1><p>${esc(dateText(visit.visited_at))}</p></div><span class="pill ${visit.payment_status==='unpaid'?'pill-unpaid':''}">${visit.payment_status==='paid'?'Paid':'Unpaid'} at registration</span></div><div class="visit-detail-grid"><div class="panel"><div class="panel-title"><span class="number">01</span><h2>Patient</h2></div><h2 class="patient-name">${esc(visit.patient_name)}</h2><p class="uid-label">${esc(visit.patient_uid)}</p><dl class="detail-list"><dt>Mobile</dt><dd>${esc(visit.mobile||'—')}</dd><dt>Age / Gender</dt><dd>${esc(visit.age||'—')} / ${esc(visit.gender||'—')}</dd><dt>Address</dt><dd>${esc(visit.address||'—')}</dd></dl></div><div class="panel"><div class="panel-title"><span class="number">02</span><h2>Consultation</h2></div><dl class="detail-list"><dt>Doctor</dt><dd>${esc(visit.doctor_name)}</dd><dt>Illness</dt><dd>${esc(visit.illness_text)}</dd><dt>Visit note</dt><dd>${esc(visit.note||'—')}</dd><dt>Consultation fee</dt><dd>${fmt(visit.consultation_fee_paise)}</dd><dt>Total with taxes</dt><dd>${fmt(total)}</dd><dt>Received at OPD</dt><dd>${fmt(visit.payment_status==='paid'?total:0)}</dd><dt>Payment mode</dt><dd>${esc(visit.payment_mode||'Unpaid')}</dd></dl></div></div><div class="panel linked-invoice"><div><span class="eyebrow">BILLING</span><h2>${visit.invoice?esc(visit.invoice.invoice_number):'Ready for an invoice'}</h2><p>${visit.invoice?`Invoice ${visit.invoice.voided_at?'voided':`balance: ${fmt(visit.invoice.balance_paise)}`}. Open Billing to view payment history and print.`:'Create an invoice with the patient and consultation already filled in. It is issued only when you choose Save invoice.'}</p></div><span class="pill">${visit.invoice?'Linked':'Not issued'}</span></div>`;
+    $('opd-detail-content').innerHTML=`<div class="visit-heading"><div><span class="eyebrow">OPD VISIT</span><h1>${esc(visit.opd_number)}</h1><p>${esc(dateText(visit.visited_at))}</p></div><span class="pill ${visit.payment_status==='unpaid'?'pill-unpaid':''}">${visit.payment_status==='paid'?'Paid':'Unpaid'} at registration</span></div><div class="visit-detail-grid"><div class="panel"><div class="panel-title"><span class="number">01</span><h2>Patient</h2></div><h2 class="patient-name">${esc(visit.patient_name)}</h2><p class="uid-label">${esc(visit.patient_uid)}</p><dl class="detail-list"><dt>Mobile</dt><dd>${esc(visit.mobile||'—')}</dd><dt>Age / Gender</dt><dd>${esc(visit.age||'—')} / ${esc(visit.gender||'—')}</dd><dt>Address</dt><dd>${esc(visit.address||'—')}</dd></dl></div><div class="panel"><div class="panel-title"><span class="number">02</span><h2>Consultation</h2></div><dl class="detail-list"><dt>Doctor</dt><dd>${esc(visit.doctor_name)}</dd><dt>Illness</dt><dd>${esc(visit.illness_text)}</dd><dt>Consultation fee</dt><dd>${fmt(visit.consultation_fee_paise)}</dd><dt>Total with taxes</dt><dd>${fmt(total)}</dd><dt>Received at OPD</dt><dd>${fmt(visit.payment_status==='paid'?total:0)}</dd><dt>Payment mode</dt><dd>${esc(visit.payment_mode||'Unpaid')}</dd></dl></div></div><div class="panel linked-invoice"><div><span class="eyebrow">BILLING</span><h2>${visit.invoice?esc(visit.invoice.invoice_number):'Ready for an invoice'}</h2><p>${visit.invoice?`Invoice ${visit.invoice.voided_at?'voided':`balance: ${fmt(visit.invoice.balance_paise)}`}. Open Billing to view payment history and print.`:'Create an invoice with the patient and consultation already filled in. It is issued only when you choose Save invoice.'}</p></div><span class="pill">${visit.invoice?'Linked':'Not issued'}</span></div>`;
     $('opd-invoice').textContent=visit.invoice?'Open invoice':'Create invoice';view('opd-detail');window.scrollTo(0,0);
   }
   $('opd-invoice').onclick=async()=>{
@@ -133,6 +133,35 @@ export function initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice}) {
     catch(error){$('opd-detail-error').textContent=error.message;}
     finally{$('opd-invoice').disabled=false;}
   };
+  function renderOpdForm(visit) {
+    const tax=Math.round(visit.consultation_fee_paise*0.09), total=visit.consultation_total_paise;
+    const received=visit.payment_status==='paid'?total:0;
+    $('opd-paper').innerHTML=`
+      <header class="invoice-heading">
+        <div><img class="invoice-logo" src="/logo.png" alt="Yogi Piles &amp; Panchkarma Center" width="80" height="80"><h2>YOGI PILES</h2><strong>&amp; Panchkarma Center</strong><p>Munshipuliya, Lucknow, Uttar Pradesh<br>Contact: +91 9453272173, +91 5223649819</p></div>
+        <div class="invoice-right"><h2>OPD REGISTRATION</h2><span class="gst">OUTPATIENT VISIT RECORD</span><p>${esc(visit.opd_number)}</p></div>
+      </header>
+      <div class="patient-box">
+        <div><span>Patient Name</span><b>${esc(visit.patient_name)}</b><span>Age / Gender</span><b>${esc(visit.age!==''&&visit.age!=null?visit.age+' Years':'-')} / ${esc(visit.gender||'-')}</b><span>Mobile Number</span><b>${esc(visit.mobile||'-')}</b></div>
+        <div><span>Reg. No. / UID</span><b>${esc(visit.patient_uid)}</b><span>Visit Date &amp; Time</span><b>${esc(dateText(visit.visited_at))}</b><span>Payment Status</span><b class="status">${visit.payment_status==='paid'?'PAID':'UNPAID'}</b></div>
+      </div>
+      <div class="opd-address"><span>Patient Address</span><strong>${esc(visit.address||'-')}</strong></div>
+      <section class="opd-consultation"><h3>CONSULTATION DETAILS</h3><dl><dt>Consulting Doctor</dt><dd>${esc(visit.doctor_name)}</dd><dt>Illness / Concern</dt><dd>${esc(visit.illness_text)}</dd></dl></section>
+      <table class="bill-table opd-charge-table"><thead><tr><th>S.NO.</th><th>DESCRIPTION</th><th>AMOUNT</th></tr></thead><tbody><tr><td>1</td><td>OPD consultation</td><td>${fmt(visit.consultation_fee_paise)}</td></tr></tbody></table>
+      <div class="bill-bottom"><div><div class="words"><strong>AMOUNT IN WORDS</strong><br>${esc(amountInWords(total))}</div><p class="opd-payment-mode">Payment mode: <strong>${esc(visit.payment_mode||'Unpaid')}</strong></p></div><div class="bill-totals"><div><span>Consultation fee:</span><b>${fmt(visit.consultation_fee_paise)}</b></div><div><span>CGST (9.00%):</span><b>${fmt(tax)}</b></div><div><span>SGST (9.00%):</span><b>${fmt(tax)}</b></div><div class="final"><span>Grand Total:</span><b>${fmt(total)}</b></div><div><span>Received at registration:</span><b>${fmt(received)}</b></div></div></div>
+      <div class="signatures"><div>Patient / Attendant Signature</div><div>Authorized Signatory</div></div>
+      <div class="bill-note">This OPD registration record shows the consultation and payment details recorded at registration.<br>Thank you for choosing Yogi Piles &amp; Panchkarma Center. Wishing you a speedy recovery.</div>
+      <footer class="bill-footer"><span>Yogi Piles &amp; Panchkarma Center · OPD Registration</span><span>${esc(visit.opd_number)}</span></footer>`;
+    view('opd-print');document.title=`${visit.opd_number} - OPD Registration - Yogi Piles`;window.scrollTo(0,0);
+  }
+  $('opd-preview').onclick=async()=>{
+    $('opd-preview').disabled=true;$('opd-detail-error').textContent='';
+    try{currentVisit=await api('/api/opd-visits/'+currentVisit.id);renderOpdForm(currentVisit);}
+    catch(error){$('opd-detail-error').textContent=error.message;}
+    finally{$('opd-preview').disabled=false;}
+  };
+  $('opd-print-back').onclick=()=>showVisit(currentVisit);
+  $('opd-print-save').onclick=()=>window.print();
   $('opd-tab').onclick=()=>newVisit();$('opd-new-tab').onclick=()=>newVisit(true);$('opd-history-new').onclick=()=>newVisit(true);
   $('opd-history-tab').onclick=history;$('opd-back').onclick=history;
   let historyTimer;$('opd-search').oninput=()=>{clearTimeout(historyTimer);historyVersion++;historyTimer=setTimeout(history,250);};

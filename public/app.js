@@ -36,7 +36,9 @@ async function fillRegistration() {
 }
 function view(name) {
   if (name === "editor") fillRegistration();
-  for (const n of ["editor", "history", "detail", "opd-editor", "opd-history", "opd-detail"]) if ($(n)) $(n).hidden = n !== name;
+  for (const n of ["editor", "history", "detail", "opd-editor", "opd-history", "opd-detail", "opd-print"]) if ($(n)) $(n).hidden = n !== name;
+  document.body.dataset.printDocument=name==='opd-print'?'opd':'invoice';
+  if(name!=='opd-print')document.title='Yogi Piles · Billing';
   const opd = name.startsWith('opd-');
   $("billing-tab").classList.toggle('active',!opd);
   $("opd-tab").classList.toggle('active',opd);
@@ -335,7 +337,10 @@ api("/api/me")
   })
   .catch(() => {});
 
-initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice(visit) {
+initOpd({$,api,esc,fmt,view,showInvoice,amountInWords(value) {
+  const whole=Math.floor(value/100),paise=value%100;
+  return `${words(whole)||'Zero'} Indian Rupees${paise?' and '+words(paise)+' Paise':''} Only`;
+},prepareInvoice(visit) {
   resetInvoiceEditor(); linkedVisit=visit;
   const form=$('invoice-form');
   for (const [name,value] of Object.entries({patient_name:visit.patient_name,age:visit.age,gender:visit.gender,payment_mode:visit.payment_mode||'UNPAID'})) {
