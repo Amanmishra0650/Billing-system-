@@ -2,5 +2,12 @@ node_modules/
 data/*
 !data/.gitkeep
 .env
+.env.*
+!.env.example
+.worktrees/
+.superpowers/
+test-results/
+playwright-report/
+.vercel/
 .DS_Store
 backups/
