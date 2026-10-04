@@ -16,7 +16,7 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await expect(page.locator('#workspace')).toBeVisible();
   await page.getByRole('button',{name:'OPD',exact:true}).click();
   const form=page.locator('#opd-form');
-  await expect(form.getByRole('combobox',{name:'Doctor',exact:true}).locator('option')).toHaveCount(4);
+  await expect(form.getByRole('combobox',{name:'Doctor',exact:true}).locator('option')).toHaveCount(7);
   await form.getByLabel('Patient name').fill('Browser Test Patient');
   await form.getByLabel('Mobile number').fill('9876501234');
   await form.getByLabel('Age',{exact:true}).fill('35');await form.getByRole('combobox',{name:'Gender',exact:true}).selectOption('Female');

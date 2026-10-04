@@ -4,7 +4,7 @@ export const ILLNESSES = [
   ['rectal-bleeding','Rectal Bleeding'], ['abdominal-pain','Abdominal Pain'],
   ['acidity','Acidity'], ['other','Other'],
 ].map(([code,name]) => ({code,name}));
-export const DOCTORS = ['Dr. Saurabh Mishra','Dr. Aman Mishra','Dr. Suraj Mishra'];
+export const DOCTORS = ['Dr. Saurabh Mishra','Dr. Aman Mishra','Dr. Suraj Mishra','Dr R. N Rathore','Dr Aditi Maurya','Dr Atul Mishra'];
 export const PAYMENT_MODES = ['CASH','UPI','CARD','BANK TRANSFER','OTHER'];
 export class AppError extends Error {
   constructor(message, status = 400, fields = {}, extra = {}) {
