@@ -1,4 +1,4 @@
-﻿import { getDatabase } from '../database.mjs';
+import { getDatabase } from '../database.mjs';
 import { createHandler } from '../handler.mjs';
 let handler;
 export default async function api(req,res) {
@@ -8,6 +8,5 @@ export default async function api(req,res) {
     if (route !== null) { url.pathname='/api/'+route;url.searchParams.delete('route');req.url=url.pathname+url.search; }
     handler ||= createHandler(await getDatabase()); await handler(req,res);
   }
-  catch (error) { console.error("BILLING_API_ERROR", { name: error?.name, code: error?.code, message: error?.message }); res.statusCode=503;res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify({error:'Service is not configured. Contact the administrator.'})); }
+  catch { res.statusCode=503;res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify({error:'Service is not configured. Contact the administrator.'})); }
 }
-
