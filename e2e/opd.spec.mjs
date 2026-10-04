@@ -16,12 +16,12 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await expect(page.locator('#workspace')).toBeVisible();
   await page.getByRole('button',{name:'OPD',exact:true}).click();
   const form=page.locator('#opd-form');
-  await expect(form.getByRole('combobox',{name:'Doctor',exact:true}).locator('option')).toHaveCount(7);
+  await expect(form.getByRole('combobox',{name:'Doctor',exact:true}).locator('option')).toHaveCount(4);
   await form.getByLabel('Patient name').fill('Browser Test Patient');
   await form.getByLabel('Mobile number').fill('9876501234');
   await form.getByLabel('Age',{exact:true}).fill('35');await form.getByRole('combobox',{name:'Gender',exact:true}).selectOption('Female');
   await form.getByLabel('Address',{exact:true}).fill('Test area, Lucknow');
-  await form.getByRole('combobox',{name:'Doctor',exact:true}).selectOption({label:'Dr. Saurabh Mishra'});
+  await form.getByRole('combobox',{name:'Doctor',exact:true}).selectOption({label:'Dr. R. N Rathore'});
   await form.getByRole('combobox',{name:'Illness',exact:true}).selectOption('other');await form.getByLabel('Other illness').fill('Test follow-up');
   await form.getByLabel('Consultation fee').fill('500');await form.getByRole('combobox',{name:'Payment status',exact:true}).selectOption('paid');
   await expect(form.getByRole('combobox',{name:'Payment mode',exact:true})).toBeVisible();await form.getByRole('combobox',{name:'Payment mode',exact:true}).selectOption('UPI');
@@ -67,7 +67,7 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await page.getByRole('button',{name:'OPD',exact:true}).click();await page.getByRole('button',{name:'New OPD registration',exact:true}).click();
   await page.getByLabel('Find a returning patient').fill('9876501234');await page.locator('.patient-match').click();
   await expect(page.locator('#selected-patient')).toContainText(uid);
-  await form.getByRole('combobox',{name:'Doctor',exact:true}).selectOption({label:'Dr. Aman Mishra'});await form.getByRole('combobox',{name:'Illness',exact:true}).selectOption('piles');
+  await form.getByRole('combobox',{name:'Doctor',exact:true}).selectOption({label:'Dr. Aditi Maurya'});await form.getByRole('combobox',{name:'Illness',exact:true}).selectOption('piles');
   await form.getByLabel('Consultation fee').fill('500');
   await page.getByRole('button',{name:'Save OPD registration',exact:true}).click();await expect(page.locator('#opd-detail')).toBeVisible();
   await expect(page.locator('.uid-label')).toHaveText(uid);

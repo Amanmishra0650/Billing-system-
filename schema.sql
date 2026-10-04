@@ -49,3 +49,14 @@ ALTER TABLE opd_visits ADD COLUMN IF NOT EXISTS discount_bps INTEGER NOT NULL DE
 ALTER TABLE opd_visits ADD COLUMN IF NOT EXISTS tax_rate_bps INTEGER NOT NULL DEFAULT 900 CHECK (tax_rate_bps IN (0,900));
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount_bps INTEGER NOT NULL DEFAULT 0 CHECK (discount_bps BETWEEN 0 AND 10000);
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount_paise BIGINT NOT NULL DEFAULT 0 CHECK (discount_paise>=0);
+
+-- Retired doctors stay linked to historical visits but cannot receive new visits.
+UPDATE doctors SET active=false
+WHERE name IN ('Dr R. N Rathore 
+Dr Aditi Maurya
+Dr Atul Mishra');
+
+-- Normalize the doctor's display name before seeding missing doctors.
+UPDATE doctors SET name='Dr. Atul Mishra'
+WHERE name='Dr.Atul Mishra'
+  AND NOT EXISTS (SELECT 1 FROM doctors WHERE name='Dr. Atul Mishra');

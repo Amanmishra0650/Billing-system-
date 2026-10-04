@@ -21,8 +21,8 @@ test('authenticated OPD workflow, patient reuse, invoice linking, and billing re
   const login = await request('/api/login','POST',{username:'test',password:'test-password-only'});
   assert.equal(login.status,200); cookie = login.cookie.split(';')[0];
   const doctors = (await request('/api/doctors')).value;
-  assert.equal(doctors.length,6);
-  for (const name of ['Dr R. N Rathore','Dr Aditi Maurya','Dr Atul Mishra']) assert.ok(doctors.some(doctor=>doctor.name===name));
+  assert.equal(doctors.length,3);
+  for (const name of ['Dr. R. N Rathore','Dr. Aditi Maurya','Dr. Atul Mishra']) assert.ok(doctors.some(doctor=>doctor.name===name));
   const patient = (await request('/api/patients','POST',{name:'Test Patient',mobile:'9876543210',age:'40',gender:'Female',address:'Test address'})).value;
   assert.match(patient.patient_uid,/^YPC-UID-\d{6}$/);
   const duplicate = await request('/api/patients','POST',{name:'Test Patient',mobile:'9876543210'});
@@ -79,7 +79,7 @@ test('authenticated OPD workflow, patient reuse, invoice linking, and billing re
   assert.equal((await request(`/api/opd-visits/${legacy.id}/invoice`,'POST',{})).value.total_paise,59000);
   await db.query('UPDATE doctors SET active=false WHERE id=$1',[doctors[0].id]);
   assert.equal((await request('/api/opd-visits','POST',input)).status,400);
-  assert.equal((await request('/api/doctors')).value.length,5);
+  assert.equal((await request('/api/doctors')).value.length,2);
   assert.equal((await request(`/api/opd-visits/${visit.id}`)).value.doctor_name,doctors[0].name);
   for(const path of ['/api/opd-visits/invalid','/api/invoices/999999']) assert.equal((await request(path)).status,404);
   assert.equal((await fetch(base+'/api/opd-visits',{method:'POST',headers:{'Content-Type':'application/json',Cookie:cookie},body:'{invalid'})).status,400);

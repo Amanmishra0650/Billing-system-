@@ -30,7 +30,7 @@ Migration copies existing password hashes, so the same login works. Old sessions
 4. Save the visit to obtain an immutable OPD number. Saving a visit does not issue an invoice.
 5. Choose **Create invoice**, review the prefilled consultation, optionally add charges, then **Save invoice**. The original consultation and patient identity are preserved. A visit can have only one invoice; repeated saves return that same invoice.
 
-Doctors are seeded as database records: Dr. Saurabh Mishra, Dr. Aman Mishra, Dr. Suraj Mishra, Dr R. N Rathore, Dr Aditi Maurya, and Dr Atul Mishra. Deactivating a doctor removes them from new-visit options while preserving historical visits. Illness is stored per visit.
+Doctors are seeded as database records: Dr. R. N Rathore, Dr. Aditi Maurya, and Dr. Atul Mishra. Deactivating a doctor removes them from new-visit options while preserving historical visits. Illness is stored per visit.
 
 New OPD consultations have no CGST or SGST. Enter Discount (%) from 0 to 100, with up to two decimal places. A consultation fee of ₹500 with 10% discount totals ₹450. Paid at registration records the discounted total received. The discount carries into the printed OPD slip and linked invoice; extra billing charges retain their existing taxes and remain outstanding. Historical visits and invoices preserve their original totals. Unpaid starts with zero received. OPD history displays the registration payment state; the linked invoice displays the current balance after subsequent payments or adjustments.
 

@@ -29,9 +29,9 @@ The OPD registration form contains:
 - Optional short note
 Doctor Dropdown
 The doctor field is a required dropdown. Manual doctor-name entry is not permitted. Initial doctors:
-1. Dr. Saurabh Mishra
-2. Dr. Aman Mishra
-3. Dr. Suraj Mishra
+1. Dr R. N Rathore 
+2. Dr Aditi Maurya
+3. Dr Atul Mishra
 Doctors are stored as database records rather than hard-coded only in the browser, allowing additional doctors to be activated later without changing historical visit records.
 Illness Dropdown
 Initial options:
