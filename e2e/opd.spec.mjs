@@ -25,7 +25,10 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await form.getByRole('combobox',{name:'Illness',exact:true}).selectOption('other');await form.getByLabel('Other illness').fill('Test follow-up');
   await form.getByLabel('Consultation fee').fill('500');await form.getByRole('combobox',{name:'Payment status',exact:true}).selectOption('paid');
   await expect(form.getByRole('combobox',{name:'Payment mode',exact:true})).toBeVisible();await form.getByRole('combobox',{name:'Payment mode',exact:true}).selectOption('UPI');
-  await expect(page.locator('#opd-total')).toContainText('590.00');
+  await form.getByLabel('Discount (%)').fill('10');
+  await expect(page.locator('#opd-total')).toContainText('450.00');
+  await expect(page.locator('#opd-editor')).not.toContainText('CGST');
+  await expect(page.locator('#opd-editor')).not.toContainText('SGST');
   await page.evaluate(()=>window.scrollTo(0,0));
   await page.screenshot({path:testInfo.outputPath('opd-desktop.png'),fullPage:true});
   await page.getByRole('button',{name:'Save OPD registration',exact:true}).click();
@@ -39,7 +42,9 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await page.emulateMedia({media:'print'});
   await expect(page.locator('#opd-paper')).toBeVisible();
   await expect(page.locator('#opd-paper')).toContainText('Browser Test Patient');
-  await expect(page.locator('#opd-paper')).toContainText('590.00');
+  await expect(page.locator('#opd-paper')).toContainText('450.00');
+  await expect(page.locator('#opd-paper')).not.toContainText('CGST');
+  await expect(page.locator('#opd-paper')).not.toContainText('SGST');
   await expect(page.locator('#detail')).toBeHidden();
   await page.pdf({path:testInfo.outputPath('opd-registration.pdf'),format:'A4',printBackground:true});
   await page.emulateMedia({media:'screen'});
@@ -47,10 +52,14 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await expect(page.locator('#invoice-opd-notice')).toBeVisible();
   await expect(page.locator('#invoice-form [name=patient_name]')).toHaveValue('Browser Test Patient');
   await expect(page.locator('#registration')).toHaveValue(uid);
-  await expect(page.locator('#opd-invoice-payment')).toContainText('590.00');
+  await expect(page.locator('#opd-invoice-payment')).toContainText('450.00');
   await expect(page.locator('.locked-charge .unit-price')).toBeDisabled();
   await page.getByRole('button',{name:'Save invoice',exact:true}).click();
   await expect(page.locator('#detail')).toBeVisible();await expect(page.locator('#invoice-paper')).toContainText('Browser Test Patient');
+  await expect(page.locator('#invoice-paper')).toContainText('450.00');
+  await expect(page.locator('#invoice-paper')).toContainText('Discount (10%)');
+  await expect(page.locator('#invoice-paper')).not.toContainText('CGST');
+  await expect(page.locator('#invoice-paper')).not.toContainText('SGST');
   await page.emulateMedia({media:'print'});await expect(page.locator('.workspace-navigation')).toBeHidden();await expect(page.locator('#opd-detail')).toBeHidden();
   await expect(page.locator('#invoice-controls')).toBeHidden();
   await page.screenshot({path:testInfo.outputPath('invoice-print.png'),fullPage:true});
@@ -67,7 +76,7 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await expect(page.locator('#invoice-controls')).toHaveCount(0);
   await expect(page.getByRole('heading',{name:'Record a payment',exact:true})).toHaveCount(0);
   await expect(page.getByRole('heading',{name:'Invoice correction',exact:true})).toHaveCount(0);
-  await expect(page.locator('#invoice-paper')).toContainText('590.00');
+  await expect(page.locator('#invoice-paper')).toContainText('500.00');
   await page.getByRole('button',{name:'OPD',exact:true}).click();await page.getByRole('button',{name:'OPD history',exact:true}).click();await page.getByLabel('Search OPD visits').fill('Browser Test Patient');
   await expect(page.locator('#opd-rows tr')).toHaveCount(2);
   await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'New OPD registration',exact:true}).click();

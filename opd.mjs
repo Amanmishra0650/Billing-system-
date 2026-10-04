@@ -14,7 +14,7 @@ export class AppError extends Error {
 export function invalid(field, message) { throw new AppError(message,400,{[field]:message}); }
 export function string(value, max = 150) { return typeof value === 'string' ? value.trim().slice(0,max) : ''; }
 export const isUuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
-export function consultationTotal(fee) { return fee + 2 * Math.round(fee * 900 / 10000); }
+export function consultationTotal(fee, discount_bps=0, tax_rate_bps=0) { return fee - Math.round(fee * discount_bps / 10000) + 2 * Math.round(fee * tax_rate_bps / 10000); }
 export function validatePatient(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) invalid('name','Enter patient details');
   const name = string(input.name,100), mobile = string(input.mobile,20), age = input.age == null ? '' : String(input.age).trim();
@@ -32,6 +32,9 @@ export function validateVisit(input) {
   if (!illness) invalid('illness_code','Select an illness');
   const illness_text = illness.code === 'other' ? string(input.custom_illness,140) : illness.name;
   if (!illness_text) invalid('custom_illness','Enter the custom illness');
+  const discount = input.discount_percent === undefined ? 0 : input.discount_percent;
+  if (typeof discount !== 'number' || !Number.isFinite(discount) || discount<0 || discount>100 || Math.abs(discount*100-Math.round(discount*100))>1e-8) invalid('discount_percent','Enter a discount from 0 to 100 with at most two decimal places');
+  const discount_bps=Math.round(discount*100);
   const fee = input.consultation_fee_paise;
   if (!Number.isSafeInteger(fee) || fee<0 || fee>100000000) invalid('consultation_fee_paise','Enter a valid consultation fee');
   if (!['paid','unpaid'].includes(input.payment_status)) invalid('payment_status','Select Paid or Unpaid payment status');
@@ -39,5 +42,5 @@ export function validateVisit(input) {
   if (input.payment_status === 'paid' && !PAYMENT_MODES.includes(payment_mode)) invalid('payment_mode','Select a payment mode for a paid visit');
   const date = input.visited_at === undefined ? new Date() : new Date(typeof input.visited_at === 'string' ? input.visited_at : NaN);
   if (!Number.isFinite(date.getTime())) invalid('visited_at','Enter a valid visit date and time');
-  return {doctor_id:input.doctor_id,illness_code:illness.code,illness_text,consultation_fee_paise:fee,payment_status:input.payment_status,payment_mode,note:string(input.note,300),visited_at:date.toISOString()};
+  return {discount_bps,tax_rate_bps:0,doctor_id:input.doctor_id,illness_code:illness.code,illness_text,consultation_fee_paise:fee,payment_status:input.payment_status,payment_mode,note:string(input.note,300),visited_at:date.toISOString()};
 }

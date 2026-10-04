@@ -6,9 +6,8 @@ export default async function api(req,res) {
     const url=new URL(req.url,'http://localhost');
     const route=url.searchParams.get('route');
     if (route !== null) { url.pathname='/api/'+route;url.searchParams.delete('route');req.url=url.pathname+url.search; }
-    const target = new URL(process.env.DATABASE_URL); console.info("BILLING_DB_TARGET", { host: target.hostname, database: target.pathname.slice(1) }); handler ||= createHandler(await getDatabase()); await handler(req,res);
+    handler ||= createHandler(await getDatabase()); await handler(req,res);
   }
   catch (error) { console.error("BILLING_API_ERROR", { name: error?.name, code: error?.code, message: error?.message }); res.statusCode=503;res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify({error:'Service is not configured. Contact the administrator.'})); }
 }
-
 

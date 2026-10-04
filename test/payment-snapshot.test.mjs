@@ -17,14 +17,14 @@ test('OPD invoice balance remains consistent when a payment and adjustment occur
       const result=await db.query(sql,args);
       if(!injected && /FROM payments/.test(sql)) {
         injected=true;
-        await changeInvoice(db,invoice.id,'payments',{amount_paise:11800,mode:'CASH'},user);
+        await changeInvoice(db,invoice.id,'payments',{amount_paise:10000,mode:'CASH'},user);
         await changeInvoice(db,invoice.id,'payment-status',{status:'unpaid'},user);
       }
       return result;
     }};
     const observed=(await getVisit(reader,visit.id)).invoice;
     assert.equal(injected,true);
-    assert.equal(observed.received_paise,0);assert.equal(observed.balance_paise,11800);
+    assert.equal(observed.received_paise,0);assert.equal(observed.balance_paise,10000);
     assert.equal((await getInvoice(db,invoice.id)).received_paise,0);
   } finally {await db.close();}
 });

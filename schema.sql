@@ -43,3 +43,9 @@ CREATE INDEX IF NOT EXISTS adjustments_invoice ON payment_adjustments(invoice_id
 CREATE TABLE IF NOT EXISTS audit_log (
  id BIGSERIAL PRIMARY KEY, invoice_id BIGINT REFERENCES invoices(id), opd_visit_id UUID REFERENCES opd_visits(id), user_id BIGINT REFERENCES users(id), action TEXT NOT NULL, details TEXT NOT NULL, created_at TEXT NOT NULL
 );
+
+-- Preserve legacy visits at their original tax rate; new visits explicitly store zero.
+ALTER TABLE opd_visits ADD COLUMN IF NOT EXISTS discount_bps INTEGER NOT NULL DEFAULT 0 CHECK (discount_bps BETWEEN 0 AND 10000);
+ALTER TABLE opd_visits ADD COLUMN IF NOT EXISTS tax_rate_bps INTEGER NOT NULL DEFAULT 900 CHECK (tax_rate_bps IN (0,900));
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount_bps INTEGER NOT NULL DEFAULT 0 CHECK (discount_bps BETWEEN 0 AND 10000);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount_paise BIGINT NOT NULL DEFAULT 0 CHECK (discount_paise>=0);
