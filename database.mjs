@@ -2,6 +2,7 @@ import { readFile, mkdir, open, unlink } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { DOCTORS } from './opd.mjs';
+import { medicineSchema } from './medicine-migration.mjs';
 try { process.loadEnvFile(); } catch (error) { if (error.code !== 'ENOENT') throw error; }
 const mapNumbers = row => Object.fromEntries(Object.entries(row).map(([key,value]) => [key, typeof value === 'bigint' ? Number(value) : value]));
 function wrap(query, exec) {
@@ -53,8 +54,10 @@ export async function createDatabase({ connectionString = process.env.DATABASE_U
 }
 export async function initializeDatabase(db) {
   const schema = await readFile(new URL('./schema.sql',import.meta.url),'utf8');
+  const medicines=await medicineSchema();
   await db.transaction(async tx => {
     await tx.exec(schema);
+    await tx.exec(medicines);
     for (const name of DOCTORS) await tx.query('INSERT INTO doctors(id,name,created_at) VALUES($1,$2,$3) ON CONFLICT(name) DO NOTHING',[randomUUID(),name,new Date().toISOString()]);
   });
 }

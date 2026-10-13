@@ -79,6 +79,7 @@ export function initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice,words}) {
     finally { $('save-opd').disabled=!optionsReady; }
   }
   async function newVisit(reset=false) {
+    clearTimeout(historyTimer);historyVersion++;
     if(reset) {
       searchVersion++;
       form.reset();clearPatient();field('visited_at').value=localNow();
@@ -138,5 +139,5 @@ export function initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice,words}) {
   };
   $('opd-tab').onclick=()=>newVisit();$('opd-new-tab').onclick=()=>newVisit(true);$('opd-history-new').onclick=()=>newVisit(true);
   $('opd-history-tab').onclick=history;$('opd-back').onclick=history;
-  let historyTimer;$('opd-search').oninput=()=>{clearTimeout(historyTimer);historyVersion++;historyTimer=setTimeout(history,250);};
+  let historyTimer;$('opd-search').oninput=()=>{clearTimeout(historyTimer);historyVersion++;historyTimer=setTimeout(()=>{if(!$('opd-history').hidden)history();},250);};
 }

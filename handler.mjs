@@ -3,6 +3,7 @@ import { AppError, ILLNESSES } from './opd.mjs';
 import { authenticate, login, cookieToken, hashToken, sessionCookie, checkProductionConfig } from './auth.mjs';
 import { getInvoice, insertInvoice, listInvoices, changeInvoice, numbered } from './billing.mjs';
 import { findPatients, createPatient, createVisit, getVisit, listVisits, invoiceFromVisit } from './opd-service.mjs';
+import { createMedicine,listMedicines,getMedicine,updateMedicine,setMedicineStatus } from './medicines.mjs';
 
 const json=(res,status,value)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(value));};
 async function body(req) {
@@ -38,6 +39,14 @@ export function createHandler(db) {
         if(path==='/api/logout'&&req.method==='POST') {
           await db.query('DELETE FROM sessions WHERE token_hash=$1',[hashToken(cookieToken(req))]); res.setHeader('Set-Cookie',sessionCookie('',0)); return json(res,200,{ok:true});
         }
+        if(path==='/api/medicines'&&req.method==='POST') return json(res,201,await createMedicine(db,await body(req)));
+        if(path==='/api/medicines'&&req.method==='GET') return json(res,200,await listMedicines(db,{q:url.searchParams.get('q'),active:url.searchParams.get('active')}));
+        const medicine=path.match(/^\/api\/medicines\/([^/]+)(\/status)?$/);
+        if(medicine) {
+          if(req.method==='GET'&&!medicine[2])return json(res,200,await getMedicine(db,medicine[1]));
+          if(req.method==='PUT'&&!medicine[2])return json(res,200,await updateMedicine(db,medicine[1],await body(req)));
+          if(req.method==='PATCH'&&medicine[2])return json(res,200,await setMedicineStatus(db,medicine[1],await body(req)));
+        }
         if(path==='/api/doctors'&&req.method==='GET') return json(res,200,(await db.query('SELECT id,name FROM doctors WHERE active=true ORDER BY created_at,name')).rows);
         if(path==='/api/illnesses'&&req.method==='GET') return json(res,200,ILLNESSES);
         if(path==='/api/patients'&&req.method==='GET') return json(res,200,await findPatients(db,url.searchParams.get('q')));
@@ -59,7 +68,7 @@ export function createHandler(db) {
         }
         throw new AppError('Not found',404);
       }
-      const assets={'/':'index.html','/index.html':'index.html','/app.js':'app.js','/opd-ui.js':'opd-ui.js','/opd-print.js':'opd-print.js','/styles.css':'styles.css','/logo.png':'logo.png'};
+      const assets={'/':'index.html','/index.html':'index.html','/app.js':'app.js','/opd-ui.js':'opd-ui.js','/opd-print.js':'opd-print.js','/invoice-totals.js':'invoice-totals.js','/medicines-ui.js':'medicines-ui.js','/medicine-picker.js':'medicine-picker.js','/medicine-drawer.js':'medicine-drawer.js','/styles.css':'styles.css','/logo.png':'logo.png'};
       if (req.method!=='GET'||!assets[path]) throw new AppError('Not found',404);
       const file=assets[path], types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',png:'image/png'};
       const content=await readFile(new URL('./public/'+file,import.meta.url));

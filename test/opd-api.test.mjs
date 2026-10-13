@@ -53,7 +53,8 @@ test('authenticated OPD workflow, patient reuse, invoice linking, and billing re
   assert.equal((await request(`/api/invoices/${unpaid.id}/void`,'POST',{reason:'Test correction'})).status,200);
   assert.equal((await request(`/api/invoices/${unpaid.id}/payments`,'POST',{amount_paise:1,mode:'CASH'})).status,409);
   const extraVisit=(await request('/api/opd-visits','POST',{...input,discount_percent:10})).value;
-  const extraInvoice=(await request(`/api/opd-visits/${extraVisit.id}/invoice`,'POST',{patient_name:'Tampered',paid_paise:999999,items:[{type:'Service',description:`Consultation - ${extraVisit.doctor_name}`,quantity:1,unit_price_paise:50000},{type:'Medicine',description:'Test medicine',quantity:1,unit_price_paise:10000}]})).value;
+  const medicine=(await request('/api/medicines','POST',{name:'Test medicine',selling_price:100,tax_percentage:18})).value;
+  const extraInvoice=(await request(`/api/opd-visits/${extraVisit.id}/invoice`,'POST',{patient_name:'Tampered',paid_paise:999999,items:[{type:'Service',description:`Consultation - ${extraVisit.doctor_name}`,quantity:1,unit_price_paise:50000},{type:'Medicine',medicine_id:medicine.id,description:'Test medicine',quantity:1,unit_price_paise:10000,tax_percentage:18}]})).value;
   assert.equal(extraInvoice.patient_name,'Test Patient');assert.equal(extraInvoice.total_paise,56800);assert.equal(extraInvoice.received_paise,45000);assert.equal(extraInvoice.balance_paise,11800);
   assert.equal((await request('/api/patients?q='+patient.patient_uid)).value[0].id,patient.id);
   const invoicesBefore=(await request('/api/invoices')).value.length;

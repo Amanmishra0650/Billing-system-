@@ -10,6 +10,8 @@ test.beforeAll(async()=>{
 });
 test.afterAll(async()=>{if(server){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}if(db)await db.close();});
 test('OPD registration, returning patient, invoice prefill, save and print',async({page},testInfo)=>{
+  // This full workflow creates visits/invoices and exports PDFs on Windows.
+  test.setTimeout(60000);
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(base);
   await page.getByLabel('Username').fill('test');await page.getByLabel('Password').fill('test-password-only');await page.getByRole('button',{name:'Sign in',exact:true}).click();

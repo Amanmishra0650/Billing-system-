@@ -14,6 +14,8 @@ export function normalizeItems(input) {
     if (!Number.isSafeInteger(unit_price_paise) || unit_price_paise < 0 || unit_price_paise > 100000000) throw Error('Enter a valid unit price');
     const amount_paise = quantity * unit_price_paise;
     if (!Number.isSafeInteger(amount_paise) || amount_paise > 1000000000) throw Error('Line amount is too large');
-    return { type, description, quantity, unit_price_paise, amount_paise };
+    const normalized={ type, description, quantity, unit_price_paise, amount_paise };
+    if(item.medicine_id && type==='Medicine') Object.assign(normalized,{medicine_id:item.medicine_id,medicine_name:item.medicine_name,tax_percentage:item.tax_percentage});
+    return normalized;
   });
 }

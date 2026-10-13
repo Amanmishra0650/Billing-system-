@@ -11,8 +11,10 @@
     "setup": "node setup.mjs",
     "backup": "node backup.mjs",
     "migrate:sqlite": "node migrate-sqlite.mjs",
+    "migrate:medicines": "node migrate-medicines.mjs",
     "restore:local": "node restore-local.mjs",
-    "test": "node --test test/*.test.mjs",
+    "build": "node scripts/verify-production.mjs",
+    "test": "node scripts/run-tests.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {

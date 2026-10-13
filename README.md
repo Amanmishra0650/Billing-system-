@@ -34,6 +34,24 @@ Doctors are seeded as database records: Dr. R. N Rathore, Dr. Aditi Maurya, and 
 
 New OPD consultations have no CGST or SGST. Enter Discount (%) from 0 to 100, with up to two decimal places. A consultation fee of ₹500 with 10% discount totals ₹450. Paid at registration records the discounted total received. The discount carries into the printed OPD slip and linked invoice; extra billing charges retain their existing taxes and remain outstanding. Historical visits and invoices preserve their original totals. Unpaid starts with zero received. OPD history displays the registration payment state; the linked invoice displays the current balance after subsequent payments or adjustments.
 
+## Medicine Master
+
+The sidebar has three separate sections: **Invoices**, **OPD**, and **Medicines**. Invoices contains only **New invoice** and **Invoice history**. Open **Medicines → Add Medicine** or **Medicines → Medicine List** to create, search, edit, and activate/deactivate medicines. Names are unique irrespective of case, including inactive records. Prices are entered in INR from 0 to 1,000,000 and taxes from 0 to 100%, both with at most two decimal places. Tax defaults to zero. Medicines are retained rather than deleted.
+
+On an invoice, choose Medicine and search the active catalogue. Selecting a medicine fills its read-only selling price; quantity remains editable. A medicine priced at ₹100 with 5% tax totals ₹105 for quantity one. Treatment and Service retain their existing 9% CGST and 9% SGST rules. OPD consultations and discounts are unchanged. Medicine tax is split between CGST and SGST; any odd-paise remainder goes to SGST. Mixed-rate invoices display tax totals without a misleading fixed rate.
+
+Issuance resolves medicines on the server and snapshots their identity, name, price, tax percentage, tax amount, and final amount. Editing a master changes future invoices only. Issued invoices and printed totals retain their snapshots even when a medicine is renamed, repriced, or deactivated. If a selected medicine changes before saving, refresh and reselect it rather than issuing a silently changed total.
+
+Apply the additive migration to the configured PostgreSQL database before deploying:
+
+```sh
+npm run migrate:medicines
+```
+
+The command does not seed users, change doctors, delete records, or recalculate invoices. It runs in a transaction, verifies fingerprints of existing records, and can be reapplied. An existing `DATABASE_URL_UNPOOLED` is preferred for this migration; otherwise it reuses `DATABASE_URL`. Credentials stay in the environment.
+
+Medicine APIs require staff authentication: `POST/GET /api/medicines`, `GET/PUT /api/medicines/:id`, and `PATCH /api/medicines/:id/status`. List supports `q` and `active=true/false`. Writes accept `name`, `selling_price` (INR), `tax_percentage`, and `is_active`. Invoice Medicine items require `medicine_id` and integer `quantity`; optional client quote values must match the current master. Saved unit prices and amounts remain integer paise, matching existing invoice storage. Historical free-text Medicine invoices remain readable.
+
 ## Billing
 
 Standalone invoices continue to work. New invoice totals are calculated on the server in integer paise. Item quantity, unit price, CGST and SGST are preserved on saved invoices. View invoices, record later payments, change Paid/Unpaid status from history, void an unpaid invoice with a reason, and use Print / Save as PDF.
@@ -70,6 +88,7 @@ Store backups securely outside the app directory/server and restrict access to c
 ```sh
 npm test
 npm run test:e2e
+npm run build
 ```
 
 Unit/API/migration tests use isolated PostgreSQL instances and synthetic data. Browser tests use Playwright and installed Chrome; set `PLAYWRIGHT_CHANNEL=msedge` for Edge, or install a supported browser. They exercise desktop/mobile OPD registration, Other illness, returning-patient lookup, invoice prefill/save, later payments, history, logout and PDF generation. Screenshots and a sample PDF are written to the ignored `test-results` directory. No test patients are inserted into the application's real database.

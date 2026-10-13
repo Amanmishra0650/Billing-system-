@@ -1,5 +1,7 @@
 import { normalizeItems } from './items.mjs';
 import { AppError, invalid, string, PAYMENT_MODES } from './opd.mjs';
+import { resolveMedicineItems } from './medicines.mjs';
+import { invoiceTotals } from './public/invoice-totals.js';
 export const numbered = (prefix,id) => `${prefix}${String(id).padStart(6,'0')}`;
 export async function nextUid(tx) { return numbered('YPC-UID-',(await tx.query("SELECT nextval('patient_uid_seq') AS n")).rows[0].n); }
 export async function audit(tx,action,{invoice_id=null,opd_visit_id=null,user_id=null,details=''}={}) {
@@ -12,21 +14,17 @@ export function validateInvoice(input, consultation=null) {
   if (!PAYMENT_MODES.includes(payment_mode) && payment_mode !== 'UNPAID') invalid('payment_mode','Select a valid payment mode');
   let items;
   try { items=normalizeItems(input.items); } catch (error) { invalid('items',error.message); }
-  const subtotal_paise=items.reduce((sum,x)=>sum+x.amount_paise,0);
-  const discount_bps=consultation?.discount_bps || 0;
-  const discount_paise=Math.round((consultation?.consultation_fee_paise || 0)*discount_bps/10000);
-  const taxable_paise=subtotal_paise-(consultation?.tax_rate_bps===0?consultation.consultation_fee_paise:0);
-  const tax_rate_bps=consultation?.tax_rate_bps===0 && items.length===1 ? 0 : 900;
-  const cgst_paise=Math.round(taxable_paise*tax_rate_bps/10000), sgst_paise=cgst_paise, total_paise=subtotal_paise-discount_paise+cgst_paise+sgst_paise;
+  const totals=invoiceTotals(items,consultation);
+  const {subtotal_paise,discount_bps,discount_paise,tax_rate_bps,cgst_paise,sgst_paise,total_paise}=totals;
   if (!Number.isSafeInteger(total_paise)) invalid('items','Invoice total is too large');
   const paid_paise=input.paid_paise;
   if (!Number.isSafeInteger(paid_paise)||paid_paise<0||paid_paise>total_paise) invalid('paid_paise','Paid amount must be between zero and the total');
-  return {discount_bps,discount_paise,patient_name,age,gender,payment_mode,paid_paise,tax_rate_bps,subtotal_paise,cgst_paise,sgst_paise,total_paise,items};
+  return {discount_bps,discount_paise,patient_name,age,gender,payment_mode,paid_paise,tax_rate_bps,subtotal_paise,cgst_paise,sgst_paise,total_paise,items:totals.items};
 }
 export async function getInvoice(db,id,{lock=false}={}) {
   const row=(await db.query(`SELECT * FROM invoices WHERE id=$1${lock?' FOR UPDATE':''}`,[id])).rows[0];
   if (!row) throw new AppError('Invoice not found',404);
-  const items=(await db.query('SELECT type,description,quantity,unit_price_paise,amount_paise FROM invoice_items WHERE invoice_id=$1 ORDER BY position',[id])).rows;
+  const items=(await db.query('SELECT type,description,quantity,unit_price_paise,amount_paise,medicine_id,medicine_name,tax_percentage,tax_amount_paise,final_amount_paise FROM invoice_items WHERE invoice_id=$1 ORDER BY position',[id])).rows;
   // One statement gives both ledgers the same PostgreSQL snapshot, including
   // reads outside a write transaction (OPD details and duplicate link responses).
   const {payments,payment_adjustments}=(await db.query(`SELECT
@@ -37,13 +35,14 @@ export async function getInvoice(db,id,{lock=false}={}) {
   return {...row,items,payments,payment_adjustments,received_paise,balance_paise:row.total_paise-received_paise,opd_number:opd?.opd_number || null};
 }
 export async function insertInvoice(tx,input,{patient_id=null,opd_visit_id=null,registration=null,user_id=null,consultation=null}={}) {
-  const v=validateInvoice(input,consultation);
+  const resolved=await resolveMedicineItems(tx,input.items);
+  const v=validateInvoice({...input,items:resolved},consultation);
   registration ||= await nextUid(tx);
   const columns=['created_at','patient_name','age','gender','registration','payment_mode','paid_paise','tax_rate_bps','subtotal_paise','cgst_paise','sgst_paise','total_paise','patient_id','opd_visit_id','discount_bps','discount_paise'];
   const values=[new Date().toISOString(),v.patient_name,v.age,v.gender,registration,v.payment_mode,v.paid_paise,v.tax_rate_bps,v.subtotal_paise,v.cgst_paise,v.sgst_paise,v.total_paise,patient_id,opd_visit_id,v.discount_bps,v.discount_paise];
   const row=(await tx.query(`INSERT INTO invoices(${columns.join(',')}) VALUES(${values.map((_,i)=>'$'+(i+1)).join(',')}) RETURNING id`,values)).rows[0];
   await tx.query('UPDATE invoices SET invoice_number=$1 WHERE id=$2',[numbered('YPC-',row.id),row.id]);
-  for (const [position,item] of v.items.entries()) await tx.query('INSERT INTO invoice_items(invoice_id,position,type,description,quantity,unit_price_paise,amount_paise) VALUES($1,$2,$3,$4,$5,$6,$7)',[row.id,position,item.type,item.description,item.quantity,item.unit_price_paise,item.amount_paise]);
+  for (const [position,item] of v.items.entries()) await tx.query('INSERT INTO invoice_items(invoice_id,position,type,description,quantity,unit_price_paise,amount_paise,medicine_id,medicine_name,tax_percentage,tax_amount_paise,final_amount_paise) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[row.id,position,item.type,item.description,item.quantity,item.unit_price_paise,item.amount_paise,item.medicine_id||null,item.medicine_name||null,item.tax_percentage??null,item.tax_amount_paise??null,item.final_amount_paise??null]);
   await audit(tx,'created',{invoice_id:row.id,opd_visit_id,user_id,details:'Invoice issued'});
   return getInvoice(tx,row.id);
 }
