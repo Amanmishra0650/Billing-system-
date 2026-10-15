@@ -132,6 +132,22 @@ button:focus-visible{outline:3px solid #70a393;outline-offset:3px}.nav:hover,.su
 }
 #opd-history .page-head h1{font-weight:800}
 #invoice-form label,#invoice-form #items .item-row>label,#invoice-form #items .line-total span{color:#000}
+.invoice-address-dialog{width:560px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);padding:28px;border:1px solid var(--line);border-radius:12px;background:#fff;color:#000;box-shadow:0 20px 60px #143c2933;overflow-y:auto}
+.invoice-address-dialog::backdrop{background:#193d3270}
+.invoice-address-dialog h2{font-size:24px;margin:0 0 10px;color:#000}
+.invoice-address-dialog p{font-size:15px;line-height:1.5;color:var(--muted)}
+.invoice-address-dialog fieldset{margin:22px 0;padding:0;border:0;min-width:0}
+.invoice-address-dialog legend{font-size:14px;font-weight:700;margin-bottom:12px}
+.invoice-address-option{display:flex;gap:12px;align-items:flex-start;padding:16px;margin-top:12px;border:1px solid var(--line);border-radius:8px;color:#000;cursor:pointer}
+.invoice-address-option:has(input:checked){background:var(--soft);border-color:var(--green)}
+.invoice-address-option:focus-within{outline:2px solid var(--green);outline-offset:2px}
+.invoice-address-option input{flex:0 0 20px;width:20px;height:20px;min-height:20px;margin:2px 0 0;accent-color:var(--green)}
+.invoice-address-option strong{display:block;margin-bottom:6px;font-size:16px}
+.invoice-address-option span span{display:block;font-size:15px;font-weight:400;line-height:1.5;overflow-wrap:anywhere}
+.invoice-address-actions{display:flex;justify-content:flex-end;gap:12px}
+.invoice-heading>div:first-child{min-width:0;flex:1}
+.invoice-heading>div:first-child p{max-width:430px;overflow-wrap:anywhere}
+@media print{.invoice-address-dialog{display:none!important}}
 #opd-history thead th{font-weight:800;font-size:13px;color:var(--green);background:#e4efe7;border-bottom:2px solid #b6cfbf}
 /* Database-backed multi-selection for invoice medicines. */
 .medicine-drawer{position:fixed;inset:0 0 0 auto;margin:0;width:380px;max-width:100vw;height:100dvh;max-height:100dvh;border:0;border-left:1px solid var(--line);padding:0;background:#f5f8f2;color:var(--ink);box-shadow:-12px 0 40px #143c2926}

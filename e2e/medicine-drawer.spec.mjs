@@ -19,7 +19,7 @@ test('drawer multi-selection stays synchronized and invoice saves/reopens with d
   test.setTimeout(60000);const errors=[];page.on('pageerror',e=>errors.push(e.message));await login(page);
   await page.locator('#invoice-form [name=patient_name]').fill('Drawer synthetic patient');
   await page.locator('#items .description').click();const drawer=page.getByRole('dialog',{name:'Select medicines',exact:true});await expect(drawer).toBeVisible();
-  const desktop=await drawer.boundingBox();expect(Math.round(desktop.width)).toBe(380);expect(Math.round(desktop.x)).toBe(page.viewportSize().width-380);
+  const desktop=await drawer.boundingBox();expect(Math.round(desktop.width)).toBe(520);expect(Math.round(desktop.x)).toBe(page.viewportSize().width-520);
   await expect(drawer.getByRole('checkbox')).toHaveCount(2);await expect(drawer).not.toContainText('Inactive Drawer Tablet');await expect(drawer).toContainText('100.00');
   await drawer.getByLabel('Search medicines').fill('Tablet B');await expect(drawer.getByRole('checkbox')).toHaveCount(1);await drawer.getByRole('checkbox',{name:'Drawer Tablet B',exact:true}).check();
   await drawer.getByLabel('Search medicines').fill('');await drawer.getByRole('checkbox',{name:'Drawer Tablet A',exact:true}).check();
@@ -32,7 +32,7 @@ test('drawer multi-selection stays synchronized and invoice saves/reopens with d
   await drawer.getByRole('checkbox',{name:'Drawer Tablet A',exact:true}).check();await drawer.getByRole('checkbox',{name:'Drawer Tablet B',exact:true}).check();await drawer.getByRole('button',{name:'Close',exact:true}).click();
   await page.getByRole('button',{name:'+ Add charge',exact:true}).click();const blank=page.locator('#items .item-row').last();await blank.locator('.item-type').selectOption('Service');await blank.locator('.description').fill('Manual service');await blank.locator('.unit-price').fill('20');await expect(page.locator('#total')).toContainText('178.60');
   await page.locator('#items .item-row[data-medicine-id]').first().locator('.description').click();await page.screenshot({path:testInfo.outputPath('medicine-drawer-desktop.png'),fullPage:true});await page.keyboard.press('Escape');await expect(drawer).not.toBeVisible();
-  await page.getByRole('button',{name:'Save invoice',exact:true}).click();await expect(page.locator('#invoice-paper')).toContainText('Drawer Tablet A');await expect(page.locator('#invoice-paper')).toContainText('178.60');
+  await page.getByRole('button',{name:'Save invoice',exact:true}).click();await page.locator('#invoice-address-dialog').getByRole('radio',{name:/Munshipuliya/}).check();await page.locator('#invoice-address-dialog').getByRole('button',{name:'Save invoice',exact:true}).click();await expect(page.locator('#invoice-paper')).toContainText('Drawer Tablet A');await expect(page.locator('#invoice-paper')).toContainText('178.60');
   await page.getByRole('button',{name:'Invoice history',exact:true}).click();await page.locator('#rows .open').first().click();await expect(page.locator('#invoice-paper')).toContainText('Drawer Tablet B');await expect(page.locator('#invoice-paper')).toContainText('Manual service');
   expect((await db.query('SELECT COUNT(*)::int AS n FROM medicines')).rows[0].n).toBe(3);expect(errors).toEqual([]);
 });

@@ -4,6 +4,11 @@ import { createDatabase } from '../database.mjs';
 import { seedAdmin } from '../auth.mjs';
 import { createHandler } from '../handler.mjs';
 let db,server,base;
+async function confirmOpdAddress(page,name='Priyadarshini Yojna'){
+  const dialog=page.getByRole('dialog',{name:'Select OPD address',exact:true});
+  await dialog.getByRole('radio',{name:new RegExp(name)}).check();
+  await dialog.getByRole('button',{name:'Save OPD registration',exact:true}).click();
+}
 test.beforeAll(async()=>{
   db=await createDatabase({connectionString:'',dataDir:'memory://'});await seedAdmin(db,'test','test-password-only');
   server=http.createServer(createHandler(db));await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base=`http://127.0.0.1:${server.address().port}`;
@@ -13,6 +18,7 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   // This full workflow creates visits/invoices and exports PDFs on Windows.
   test.setTimeout(60000);
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.addInitScript(()=>{window.opdPrintSnapshots=[];window.print=()=>window.opdPrintSnapshots.push({paper:document.querySelector('#opd-paper')?.textContent,detailVisible:!document.querySelector('#opd-detail')?.hidden});});
   await page.goto(base);
   await page.getByLabel('Username').fill('test');await page.getByLabel('Password').fill('test-password-only');await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await expect(page.locator('#workspace')).toBeVisible();
@@ -33,8 +39,29 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await expect(page.locator('#opd-editor')).not.toContainText('SGST');
   await page.evaluate(()=>window.scrollTo(0,0));
   await page.screenshot({path:testInfo.outputPath('opd-desktop.png'),fullPage:true});
+  await page.route('**/api/opd-visits',route=>route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'Registration unavailable for test'})}));
   await page.getByRole('button',{name:'Save OPD registration',exact:true}).click();
+  await confirmOpdAddress(page);
+  await expect(page.locator('#opd-form-message')).toContainText('Registration unavailable for test');
+  expect(await page.evaluate(()=>window.opdPrintSnapshots.length)).toBe(0);
+  await expect(form.getByLabel('Patient name')).toHaveValue('Browser Test Patient');
+  await page.unroute('**/api/opd-visits');
+  await page.getByRole('button',{name:'Save OPD registration',exact:true}).click();
+  const addressDialog=page.getByRole('dialog',{name:'Select OPD address',exact:true});
+  await expect(addressDialog.getByRole('radio')).toHaveCount(2);
+  await expect(addressDialog.locator(':checked')).toHaveCount(0);
+  await addressDialog.getByRole('button',{name:'Save OPD registration',exact:true}).click();
+  await expect(addressDialog).toBeVisible();
+  expect((await db.query('SELECT count(*)::int AS n FROM opd_visits')).rows[0].n).toBe(0);
+  await addressDialog.getByRole('button',{name:'Cancel',exact:true}).click();
+  await expect(form.getByLabel('Patient name')).toHaveValue('Browser Test Patient');
+  await page.getByRole('button',{name:'Save OPD registration',exact:true}).click();
+  await confirmOpdAddress(page);
   await expect(page.locator('#opd-detail')).toBeVisible();
+  await expect.poll(()=>page.evaluate(()=>window.opdPrintSnapshots.length)).toBe(1);
+  const automaticPrint=await page.evaluate(()=>window.opdPrintSnapshots[0]);
+  expect(automaticPrint.detailVisible).toBe(true);expect(automaticPrint.paper).toContain('Browser Test Patient');expect(automaticPrint.paper).toContain('450.00');expect(automaticPrint.paper).toMatch(/OPD-\d{6}/);
+  expect(automaticPrint.paper).toContain('Priyadarshini Yojna');
   const uid=await page.locator('.uid-label').textContent();
   await expect(page.locator('#opd-detail')).toContainText('Test follow-up');
   await expect(page.getByRole('button',{name:'Print OPD / Save as PDF',exact:true})).toBeVisible();
@@ -56,7 +83,7 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await expect(page.locator('#registration')).toHaveValue(uid);
   await expect(page.locator('#opd-invoice-payment')).toContainText('450.00');
   await expect(page.locator('.locked-charge .unit-price')).toBeDisabled();
-  await page.getByRole('button',{name:'Save invoice',exact:true}).click();
+  await page.getByRole('button',{name:'Save invoice',exact:true}).click();await page.locator('#invoice-address-dialog').getByRole('radio',{name:/Munshipuliya/}).check();await page.locator('#invoice-address-dialog').getByRole('button',{name:'Save invoice',exact:true}).click();
   await expect(page.locator('#detail')).toBeVisible();await expect(page.locator('#invoice-paper')).toContainText('Browser Test Patient');
   await expect(page.locator('#invoice-paper')).toContainText('450.00');
   await expect(page.locator('#invoice-paper')).toContainText('Discount (10%)');
@@ -71,9 +98,11 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await expect(page.locator('#selected-patient')).toContainText(uid);
   await form.getByRole('combobox',{name:'Doctor',exact:true}).selectOption({label:'Dr. Aditi Maurya'});await form.getByRole('combobox',{name:'Illness',exact:true}).selectOption('piles');
   await form.getByLabel('Consultation fee').fill('500');
-  await page.getByRole('button',{name:'Save OPD registration',exact:true}).click();await expect(page.locator('#opd-detail')).toBeVisible();
+  await page.getByRole('button',{name:'Save OPD registration',exact:true}).click();
+  await confirmOpdAddress(page,'Munshipuliya');
+  await expect(page.locator('#opd-detail')).toBeVisible();
   await expect(page.locator('.uid-label')).toHaveText(uid);
-  await page.getByRole('button',{name:'Create invoice',exact:true}).click();await page.getByRole('button',{name:'Save invoice',exact:true}).click();
+  await page.getByRole('button',{name:'Create invoice',exact:true}).click();await page.getByRole('button',{name:'Save invoice',exact:true}).click();await page.locator('#invoice-address-dialog').getByRole('radio',{name:/Munshipuliya/}).check();await page.locator('#invoice-address-dialog').getByRole('button',{name:'Save invoice',exact:true}).click();
   await expect(page.locator('#detail')).toBeVisible();
   await expect(page.locator('#invoice-controls')).toHaveCount(0);
   await expect(page.getByRole('heading',{name:'Record a payment',exact:true})).toHaveCount(0);
@@ -81,6 +110,8 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await expect(page.locator('#invoice-paper')).toContainText('500.00');
   await page.getByRole('button',{name:'OPD',exact:true}).click();await page.getByRole('button',{name:'OPD history',exact:true}).click();await page.getByLabel('Search OPD visits').fill('Browser Test Patient');
   await expect(page.locator('#opd-rows tr')).toHaveCount(2);
+  await page.locator('#opd-rows tr').last().getByRole('button',{name:'Open'}).click();
+  await expect(page.locator('#opd-paper .invoice-heading')).toContainText('Priyadarshini Yojna');
   await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'New OPD registration',exact:true}).click();
   await expect(page.locator('#opd-form')).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);

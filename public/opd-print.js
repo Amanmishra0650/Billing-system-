@@ -1,8 +1,9 @@
-﻿export function renderOpdSlip(v, {esc, fmt, words}) {
+import {CLINIC_ADDRESSES} from './clinic-addresses.js';
+export function renderOpdSlip(v, {esc, fmt, words}) {
   const fee=v.consultation_fee_paise, tax=Math.round(fee*(v.tax_rate_bps ?? 900)/10000), discount=Math.round(fee*(v.discount_bps||0)/10000);
   const total=v.consultation_total_paise, paid=v.payment_status==='paid', received=paid?total:0;
   const date=new Date(v.visited_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',dateStyle:'medium',timeStyle:'short'});
-  return `<div class="invoice-heading"><div><img class="invoice-logo" src="/logo.png" alt="Yogi Piles &amp; Panchkarma Center" width="80" height="80"><h2>YOGI PILES</h2><strong>&amp; Panchkarma Center</strong><p>Munshipuliya, Lucknow, Uttar Pradesh<br>Contact: +91 9453272173, +91 5223649819</p></div><div class="invoice-right"><h2>OPD REGISTRATION</h2><span class="gst">OUTPATIENT VISIT RECORD</span><p>${esc(v.opd_number)}</p></div></div>
+  return `<div class="invoice-heading"><div><img class="invoice-logo" src="/logo.png" alt="Yogi Piles &amp; Panchkarma Center" width="80" height="80"><h2>YOGI PILES</h2><strong>&amp; Panchkarma Center</strong><p>${esc(v.clinic_address || CLINIC_ADDRESSES[0].address)}<br>Contact: +91 9453272173, +91 5223649819</p></div><div class="invoice-right"><h2>OPD REGISTRATION</h2><span class="gst">OUTPATIENT VISIT RECORD</span><p>${esc(v.opd_number)}</p></div></div>
   <div class="patient-box"><div><span>Patient Name</span><b>${esc(v.patient_name)}</b><span>Age / Gender</span><b>${esc(v.age??'—')} Years / ${esc(v.gender||'—')}</b><span>Mobile Number</span><b>${esc(v.mobile||'—')}</b></div><div><span>Reg. No. / UID</span><b>${esc(v.patient_uid)}</b><span>Visit Date &amp; Time</span><b>${esc(date)}</b><span>Payment Status</span><b class="status">${paid?'PAID':'UNPAID'}</b></div></div>
   <div class="opd-address"><span>Patient Address</span><b>${esc(v.address||'—')}</b></div>
   <div class="opd-consultation"><h3>CONSULTATION DETAILS</h3><dl><dt>Consulting Doctor</dt><dd>${esc(v.doctor_name)}</dd><dt>Illness / Concern</dt><dd>${esc(v.illness_text)}</dd></dl></div>

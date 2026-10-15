@@ -27,7 +27,7 @@ test('authenticated OPD workflow, patient reuse, invoice linking, and billing re
   assert.match(patient.patient_uid,/^YPC-UID-\d{6}$/);
   const duplicate = await request('/api/patients','POST',{name:'Test Patient',mobile:'9876543210'});
   assert.equal(duplicate.status,409); assert.equal(duplicate.value.matches[0].id,patient.id);
-  const input = {patient_id:patient.id,doctor_id:doctors[0].id,illness_code:'piles',consultation_fee_paise:50000,payment_status:'paid',payment_mode:'CASH'};
+  const input = {clinic_address_id:'munshipuliya',patient_id:patient.id,doctor_id:doctors[0].id,illness_code:'piles',consultation_fee_paise:50000,payment_status:'paid',payment_mode:'CASH'};
   assert.equal((await request('/api/opd-visits','POST',{...input,doctor_id:'11111111-1111-4111-8111-111111111111'})).status,400);
   const first = await request('/api/opd-visits','POST',input);
   assert.equal(first.status,201);
@@ -37,13 +37,13 @@ test('authenticated OPD workflow, patient reuse, invoice linking, and billing re
   assert.equal((await request('/api/opd-visits?q=9876543210')).value.length,2);
   assert.equal((await request('/api/opd-visits?q=Follow-up')).value.length,1);
   assert.equal((await request('/api/invoices')).value.length,0,'saving OPD never issues an invoice');
-  const linked = await Promise.all([request(`/api/opd-visits/${visit.id}/invoice`,'POST',{}),request(`/api/opd-visits/${visit.id}/invoice`,'POST',{})]);
+  const linked = await Promise.all([request(`/api/opd-visits/${visit.id}/invoice`,'POST',{clinic_address_id:'munshipuliya'}),request(`/api/opd-visits/${visit.id}/invoice`,'POST',{clinic_address_id:'munshipuliya'})]);
   assert.deepEqual(linked.map(x=>x.status).sort(),[200,201]);
   assert.equal(linked[0].value.id,linked[1].value.id);
   const invoice = linked[0].value;
   assert.equal(invoice.registration,patient.patient_uid); assert.equal(invoice.received_paise,50000); assert.equal(invoice.total_paise,50000);
   assert.equal((await request(`/api/opd-visits/${visit.id}`)).value.invoice.id,invoice.id);
-  const unpaid = (await request(`/api/opd-visits/${second.id}/invoice`,'POST',{})).value;
+  const unpaid = (await request(`/api/opd-visits/${second.id}/invoice`,'POST',{clinic_address_id:'munshipuliya'})).value;
   assert.equal(unpaid.received_paise,0);
   const overpay = await Promise.all([request(`/api/invoices/${unpaid.id}/payments`,'POST',{amount_paise:40000,mode:'CASH'}),request(`/api/invoices/${unpaid.id}/payments`,'POST',{amount_paise:40000,mode:'CASH'})]);
   assert.deepEqual(overpay.map(x=>x.status).sort(),[201,400]);
@@ -54,7 +54,7 @@ test('authenticated OPD workflow, patient reuse, invoice linking, and billing re
   assert.equal((await request(`/api/invoices/${unpaid.id}/payments`,'POST',{amount_paise:1,mode:'CASH'})).status,409);
   const extraVisit=(await request('/api/opd-visits','POST',{...input,discount_percent:10})).value;
   const medicine=(await request('/api/medicines','POST',{name:'Test medicine',selling_price:100,tax_percentage:18})).value;
-  const extraInvoice=(await request(`/api/opd-visits/${extraVisit.id}/invoice`,'POST',{patient_name:'Tampered',paid_paise:999999,items:[{type:'Service',description:`Consultation - ${extraVisit.doctor_name}`,quantity:1,unit_price_paise:50000},{type:'Medicine',medicine_id:medicine.id,description:'Test medicine',quantity:1,unit_price_paise:10000,tax_percentage:18}]})).value;
+  const extraInvoice=(await request(`/api/opd-visits/${extraVisit.id}/invoice`,'POST',{clinic_address_id:'munshipuliya',patient_name:'Tampered',paid_paise:999999,items:[{type:'Service',description:`Consultation - ${extraVisit.doctor_name}`,quantity:1,unit_price_paise:50000},{type:'Medicine',medicine_id:medicine.id,description:'Test medicine',quantity:1,unit_price_paise:10000,tax_percentage:18}]})).value;
   assert.equal(extraInvoice.patient_name,'Test Patient');assert.equal(extraInvoice.total_paise,56800);assert.equal(extraInvoice.received_paise,45000);assert.equal(extraInvoice.balance_paise,11800);
   assert.equal((await request('/api/patients?q='+patient.patient_uid)).value[0].id,patient.id);
   const invoicesBefore=(await request('/api/invoices')).value.length;
@@ -66,7 +66,7 @@ test('authenticated OPD workflow, patient reuse, invoice linking, and billing re
     const expected=50000-Math.round(50000*percent/100);
     assert.equal(discounted.consultation_total_paise,expected);
     assert.equal((await request(`/api/opd-visits/${discounted.id}`)).value.discount_bps,percent*100);
-    const result=await request(`/api/opd-visits/${discounted.id}/invoice`,'POST',{discount_percent:0,tax_rate_bps:900});
+    const result=await request(`/api/opd-visits/${discounted.id}/invoice`,'POST',{clinic_address_id:'munshipuliya',discount_percent:0,tax_rate_bps:900});
     assert.equal(result.status,201);
     assert.equal(result.value.total_paise,expected);
     assert.equal(result.value.received_paise,expected);
@@ -77,7 +77,7 @@ test('authenticated OPD workflow, patient reuse, invoice linking, and billing re
   const legacy=(await request('/api/opd-visits','POST',input)).value;
   await db.query('UPDATE opd_visits SET tax_rate_bps=900 WHERE id=$1',[legacy.id]);
   assert.equal((await request(`/api/opd-visits/${legacy.id}`)).value.consultation_total_paise,59000);
-  assert.equal((await request(`/api/opd-visits/${legacy.id}/invoice`,'POST',{})).value.total_paise,59000);
+  assert.equal((await request(`/api/opd-visits/${legacy.id}/invoice`,'POST',{clinic_address_id:'munshipuliya'})).value.total_paise,59000);
   await db.query('UPDATE doctors SET active=false WHERE id=$1',[doctors[0].id]);
   assert.equal((await request('/api/opd-visits','POST',input)).status,400);
   assert.equal((await request('/api/doctors')).value.length,2);

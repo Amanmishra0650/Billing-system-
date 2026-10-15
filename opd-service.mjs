@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { AppError, invalid, string, isUuid, validatePatient, validateVisit, consultationTotal } from './opd.mjs';
 import { numbered, audit, getInvoice, insertInvoice } from './billing.mjs';
+import { CLINIC_ADDRESSES } from './public/clinic-addresses.js';
 const searchTerm = value => '%'+string(value,100).replace(/[\\%_]/g,'\\$&')+'%';
 export async function findPatients(db,q='') {
   if (!string(q)) return [];
@@ -28,6 +29,8 @@ export async function listVisits(db,q='') {
   return (await db.query(visitSelect+` WHERE p.name ILIKE $1 OR p.patient_uid ILIKE $1 OR p.mobile ILIKE $1 OR v.opd_number ILIKE $1 OR d.name ILIKE $1 OR v.illness_text ILIKE $1 ORDER BY v.visited_at DESC,v.opd_sequence DESC LIMIT 100`,[searchTerm(q)])).rows;
 }
 export async function createVisit(db,input,user_id) {
+  const clinic=CLINIC_ADDRESSES.find(address=>address.id===input.clinic_address_id);
+  if(!clinic)invalid('clinic_address_id','Select a clinic address');
   const v=validateVisit(input);
   return db.transaction(async tx => {
     const doctor=(await tx.query('SELECT id FROM doctors WHERE id=$1 AND active=true FOR SHARE',[v.doctor_id])).rows[0];
@@ -39,7 +42,7 @@ export async function createVisit(db,input,user_id) {
       if (!patient) invalid('patient_id','Patient not found');
     } else { patient=await insertPatient(tx,input.patient); }
     const id=randomUUID(), seq=(await tx.query("SELECT nextval('opd_number_seq') AS n")).rows[0].n;
-    await tx.query('INSERT INTO opd_visits(id,opd_sequence,opd_number,patient_id,doctor_id,illness_code,illness_text,consultation_fee_paise,payment_status,payment_mode,note,visited_at,created_by,created_at,discount_bps,tax_rate_bps) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',[id,seq,numbered('OPD-',seq),patient.id,v.doctor_id,v.illness_code,v.illness_text,v.consultation_fee_paise,v.payment_status,v.payment_mode,v.note,v.visited_at,user_id,new Date().toISOString(),v.discount_bps,v.tax_rate_bps]);
+    await tx.query('INSERT INTO opd_visits(id,opd_sequence,opd_number,patient_id,doctor_id,illness_code,illness_text,consultation_fee_paise,payment_status,payment_mode,note,visited_at,created_by,created_at,discount_bps,tax_rate_bps,clinic_address) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)',[id,seq,numbered('OPD-',seq),patient.id,v.doctor_id,v.illness_code,v.illness_text,v.consultation_fee_paise,v.payment_status,v.payment_mode,v.note,v.visited_at,user_id,new Date().toISOString(),v.discount_bps,v.tax_rate_bps,clinic.address]);
     await audit(tx,'opd_created',{opd_visit_id:id,user_id,details:JSON.stringify({payment_status:v.payment_status,consultation_fee_paise:v.consultation_fee_paise})});
     return getVisit(tx,id);
   });
@@ -55,7 +58,7 @@ export async function invoiceFromVisit(db,id,input,user_id) {
     // The saved consultation is immutable. Extra charges may be added below it.
     const first=items?.[0];
     if (!Array.isArray(items)||first?.type!=='Service'||first?.quantity!==1||first?.unit_price_paise!==consultation.unit_price_paise||first?.description!==consultation.description) invalid('items','Keep the saved consultation charge unchanged');
-    const invoice=await insertInvoice(tx,{patient_name:visit.patient_name,age:visit.age,gender:visit.gender,items,payment_mode:visit.payment_mode || 'UNPAID',paid_paise:visit.payment_status==='paid'?visit.consultation_total_paise:0},{patient_id:visit.patient_id,opd_visit_id:id,registration:visit.patient_uid,user_id,consultation:visit});
+    const invoice=await insertInvoice(tx,{patient_name:visit.patient_name,age:visit.age,gender:visit.gender,items,payment_mode:visit.payment_mode || 'UNPAID',paid_paise:visit.payment_status==='paid'?visit.consultation_total_paise:0,clinic_address_id:input.clinic_address_id},{patient_id:visit.patient_id,opd_visit_id:id,registration:visit.patient_uid,user_id,consultation:visit});
     await audit(tx,'invoice_linked',{invoice_id:invoice.id,opd_visit_id:id,user_id,details:'OPD consultation linked to invoice'});
     return {invoice,created:true};
   });

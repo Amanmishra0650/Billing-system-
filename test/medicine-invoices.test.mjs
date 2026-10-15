@@ -7,7 +7,7 @@ import { invoiceTotals } from '../public/invoice-totals.js';
 import { seedAdmin } from '../auth.mjs';
 import { createPatient,createVisit,invoiceFromVisit } from '../opd-service.mjs';
 
-const patient={patient_name:'Synthetic patient',payment_mode:'CASH',paid_paise:0};
+const patient={clinic_address_id:'munshipuliya',patient_name:'Synthetic patient',payment_mode:'CASH',paid_paise:0};
 test('medicine invoices snapshot server values and survive master edits and deactivation',async()=>{
   const db=await createDatabase({connectionString:'',dataDir:'memory://'});
   try{
@@ -64,9 +64,9 @@ test('persisted mixed OPD invoice keeps consultation payment and medicine tax sn
     const user=(await db.query('SELECT id FROM users LIMIT 1')).rows[0].id;
     const doctor=(await db.query('SELECT id,name FROM doctors LIMIT 1')).rows[0];
     const person=await createPatient(db,{name:'Synthetic medicine OPD patient'});
-    const visit=await createVisit(db,{patient_id:person.id,doctor_id:doctor.id,illness_code:'piles',consultation_fee_paise:50000,discount_percent:10,payment_status:'paid',payment_mode:'CASH'},user);
+    const visit=await createVisit(db,{clinic_address_id:'munshipuliya',patient_id:person.id,doctor_id:doctor.id,illness_code:'piles',consultation_fee_paise:50000,discount_percent:10,payment_status:'paid',payment_mode:'CASH'},user);
     const m=await createMedicine(db,{name:'OPD Tablet',selling_price:100,tax_percentage:5});
-    const {invoice}=await invoiceFromVisit(db,visit.id,{items:[{type:'Service',description:`Consultation - ${doctor.name}`,quantity:1,unit_price_paise:50000},{type:'Medicine',medicine_id:m.id,quantity:2},{type:'Treatment',description:'Extra treatment',quantity:1,unit_price_paise:10000}]},user);
+    const {invoice}=await invoiceFromVisit(db,visit.id,{clinic_address_id:'munshipuliya',items:[{type:'Service',description:`Consultation - ${doctor.name}`,quantity:1,unit_price_paise:50000},{type:'Medicine',medicine_id:m.id,quantity:2},{type:'Treatment',description:'Extra treatment',quantity:1,unit_price_paise:10000}]},user);
     assert.equal(invoice.total_paise,77800);assert.equal(invoice.received_paise,45000);assert.equal(invoice.balance_paise,32800);
     assert.equal(invoice.discount_paise,5000);assert.equal(invoice.items[1].final_amount_paise,21000);
     await updateMedicine(db,m.id,{name:'Changed OPD Tablet',selling_price:300,tax_percentage:0});

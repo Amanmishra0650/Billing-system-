@@ -54,10 +54,10 @@ test('medicine master edit/status/search and searchable invoice autofill preserv
   await row.locator('.quantity').fill('2');await expect(page.locator('#total')).toContainText('210.00');
   await row.locator('.item-type').selectOption('Treatment');await expect(row.locator('.unit-price')).not.toHaveAttribute('readonly','');
   await row.locator('.description').fill('Treatment');await row.locator('.unit-price').fill('100');await expect(page.locator('#total')).toContainText('236.00');
-  await row.locator('.item-type').selectOption('Medicine');await row.locator('.description').click();await drawer.getByRole('checkbox',{name:'Triphala Tablets',exact:true}).check();await drawer.getByRole('button',{name:'Close',exact:true}).click();await row.locator('.quantity').fill('2');
+  await row.locator('.item-type').selectOption('Medicine');await expect(drawer).toBeVisible();await drawer.getByRole('checkbox',{name:'Triphala Tablets',exact:true}).check();await drawer.getByRole('button',{name:'Close',exact:true}).click();await row.locator('.quantity').fill('2');
   await page.screenshot({path:testInfo.outputPath('medicine-invoice-desktop.png'),fullPage:true});
-  await page.getByRole('button',{name:'Save invoice',exact:true}).click();await expect(page.locator('#detail')).toBeVisible();await expect(page.locator('#invoice-paper')).toContainText('210.00');
-  await expect(page.locator('#invoice-paper')).toContainText('5%');
+  await page.getByRole('button',{name:'Save invoice',exact:true}).click();await page.locator('#invoice-address-dialog').getByRole('radio',{name:/Munshipuliya/}).check();await page.locator('#invoice-address-dialog').getByRole('button',{name:'Save invoice',exact:true}).click();await expect(page.locator('#detail')).toBeVisible();await expect(page.locator('#invoice-paper')).toContainText('210.00');
+  await expect(page.locator('#invoice-paper')).not.toContainText('MEDICINE TAX');
   await page.getByRole('button',{name:'Medicines',exact:true}).click();await page.getByRole('button',{name:'Medicine List',exact:true}).click();await page.locator('#medicine-rows').getByRole('button',{name:'Edit',exact:true}).click();
   await form.getByLabel('Medicine Name',{exact:true}).fill('Triphala Plus');await form.getByLabel('Selling Price in INR').fill('200');await form.getByLabel('Tax Percentage').fill('12');await form.getByRole('button',{name:'Save Medicine',exact:true}).click();
   await expect(page.locator('#medicine-rows')).toContainText('Triphala Plus');

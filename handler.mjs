@@ -69,6 +69,8 @@ export function createHandler(db) {
         throw new AppError('Not found',404);
       }
       const assets={'/':'index.html','/index.html':'index.html','/app.js':'app.js','/opd-ui.js':'opd-ui.js','/opd-print.js':'opd-print.js','/invoice-totals.js':'invoice-totals.js','/medicines-ui.js':'medicines-ui.js','/medicine-picker.js':'medicine-picker.js','/medicine-drawer.js':'medicine-drawer.js','/styles.css':'styles.css','/logo.png':'logo.png'};
+      assets['/clinic-addresses.js']='clinic-addresses.js';
+      assets['/invoice-address.js']='invoice-address.js';
       if (req.method!=='GET'||!assets[path]) throw new AppError('Not found',404);
       const file=assets[path], types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',png:'image/png'};
       const content=await readFile(new URL('./public/'+file,import.meta.url));

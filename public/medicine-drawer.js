@@ -58,6 +58,7 @@ export function initMedicineDrawer({api,fmt,getRows,addMedicine,removeMedicine})
     trigger=field;trigger.setAttribute('aria-expanded','true');search.value='';dialog.showModal();document.body.classList.add('medicine-drawer-open');search.focus();load();
   }
   dialog.addEventListener('close',()=>{
+    if(dialog.open)return;
     version++;document.body.classList.remove('medicine-drawer-open');trigger?.setAttribute('aria-expanded','false');
     if(trigger?.isConnected)trigger.focus();else document.getElementById('add-item')?.focus();
   });

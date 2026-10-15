@@ -24,6 +24,8 @@ Migration copies existing password hashes, so the same login works. Old sessions
 
 ## OPD workflow
 
+**Save OPD registration** opens a required address popup with Munshipuliya and Priyadarshini Yojna radio buttons. After selecting an address and confirming, the registration saves and its print/Save as PDF dialog opens automatically. The visit stores its clinic address separately from the patient's home address; history reprints preserve that choice. Cancel keeps the form intact. Existing visits continue to print the original Munshipuliya address. New OPD API requests require `clinic_address_id` (`munshipuliya` or `priyadarshini`). Apply the additive `opd_visits.clinic_address` column with `npm run setup` before deployment; local startup applies it automatically.
+
 1. Select **OPD → New OPD registration**.
 2. Search by UID, name, or mobile to reuse a patient. A new patient receives one permanent UID. Possible duplicate patients must be selected or explicitly identified as a different person.
 3. Select a doctor, illness, visit time, consultation fee and Paid/Unpaid status. Other illness requires a description. Paid requires a payment mode.
@@ -55,6 +57,8 @@ Medicine APIs require staff authentication: `POST/GET /api/medicines`, `GET/PUT 
 ## Billing
 
 Standalone invoices continue to work. New invoice totals are calculated on the server in integer paise. Item quantity, unit price, CGST and SGST are preserved on saved invoices. View invoices, record later payments, change Paid/Unpaid status from history, void an unpaid invoice with a reason, and use Print / Save as PDF.
+
+**Save invoice** opens a required clinic-address selection for both standalone and OPD-linked invoices. Choose Munshipuliya or Priyadarshini Yojna, then confirm Save invoice. Cancel returns to the filled form. The server validates `clinic_address_id` (`munshipuliya` or `priyadarshini`) and snapshots the address on the invoice; history and PDF reprints use that saved text. Existing invoices retain the original Munshipuliya address. Apply the additive `clinic_address` column with `npm run setup` against the configured database before deploying this version; local startup applies it automatically. No existing invoice amounts or addresses are rewritten.
 
 Invoice numbers, permanent patient UIDs, and OPD numbers are assigned on the server. Legacy registration values are retained as issued and are not silently assigned to new patient profiles. A shared UID sequence starts above imported historical UIDs; invoice and OPD numbers have separate sequences. Sequences can have gaps after failed or rolled-back operations.
 

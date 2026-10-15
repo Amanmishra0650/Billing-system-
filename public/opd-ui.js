@@ -1,5 +1,7 @@
 import { renderOpdSlip } from './opd-print.js';
+import { initInvoiceAddressPicker } from './invoice-address.js';
 export function initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice,words}) {
+  const chooseOpdAddress=initInvoiceAddressPicker({id:'opd-address-dialog',title:'Select OPD address',description:'Choose the clinic address to print on this OPD slip.',confirmLabel:'Save OPD registration'});
   let selectedPatient=null, currentVisit=null, optionsReady=false, searchVersion=0, historyVersion=0;
   const modes='<option value="">Select payment mode</option><option>CASH</option><option>UPI</option><option>CARD</option><option>BANK TRANSFER</option><option>OTHER</option>';
   document.querySelector('main').insertAdjacentHTML('beforeend',`
@@ -107,7 +109,12 @@ export function initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice,words}) {
     event.preventDefault();$('opd-form-message').textContent='';$('save-opd').disabled=true;
     form.querySelectorAll('[aria-invalid]').forEach(el=>el.removeAttribute('aria-invalid'));
     const data={patient_id:selectedPatient?.id,patient:selectedPatient?undefined:{name:field('name').value,mobile:field('mobile').value,age:field('age').value,gender:field('gender').value,address:field('address').value,confirm_distinct_patient:$('confirm-distinct').checked},visited_at:new Date(field('visited_at').value).toISOString(),doctor_id:field('doctor_id').value,illness_code:field('illness_code').value,custom_illness:field('custom_illness').value,discount_percent:Number(field('discount_percent').value),consultation_fee_paise:Math.round(Number(field('consultation_fee').value)*100),payment_status:field('payment_status').value,payment_mode:field('payment_mode').value};
-    try { const visit=await api('/api/opd-visits',{method:'POST',body:JSON.stringify(data)});form.reset();clearPatient();field('visited_at').value='';field('custom_illness').required=false;$('custom-illness-label').hidden=true;showVisit(visit); }
+    try {
+      const address=await chooseOpdAddress();
+      if(!address)return;
+      data.clinic_address_id=address;
+      const visit=await api('/api/opd-visits',{method:'POST',body:JSON.stringify(data)});form.reset();clearPatient();field('visited_at').value='';field('custom_illness').required=false;$('custom-illness-label').hidden=true;showVisit(visit);window.print();
+    }
     catch(error) {
       $('opd-form-message').textContent=error.message;
       for(const key of Object.keys(error.fields||{})) { const el=field(key==='consultation_fee_paise'?'consultation_fee':key); if(el) el.setAttribute('aria-invalid','true'); }
