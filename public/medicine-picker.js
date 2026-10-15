@@ -5,7 +5,7 @@ export function setMedicineRow(row,medicine) {
   const name=row.querySelector('.description');name.value=medicine.name;name.setCustomValidity('');
   row.querySelector('.unit-price').value=Number(medicine.selling_price).toFixed(2);
   row.querySelector('.quantity').value='1';
-  row.querySelector('.medicine-picker-state').textContent=`Tax: ${Number(medicine.tax_percentage)}%`;
+  row.querySelector('.medicine-picker-state').textContent='';
 }
 
 export function attachMedicinePicker(row,{openDrawer,onChange}) {
@@ -24,7 +24,7 @@ export function attachMedicinePicker(row,{openDrawer,onChange}) {
       input.placeholder='Treatment or service name';input.setCustomValidity('');
     }
   }
-  type.addEventListener('change',()=>{configure(true);onChange();});
+  type.addEventListener('change',()=>{configure(true);onChange();if(medicine())openDrawer(input);});
   input.addEventListener('click',()=>{if(medicine())openDrawer(input);});
   input.addEventListener('keydown',event=>{if(medicine()&&['Enter',' ','ArrowDown'].includes(event.key)){event.preventDefault();openDrawer(input);}});
   configure();

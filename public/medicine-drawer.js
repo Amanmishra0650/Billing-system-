@@ -2,6 +2,7 @@ export function initMedicineDrawer({api,fmt,getRows,addMedicine,removeMedicine})
   const dialog=document.createElement('dialog');
   dialog.id='medicine-drawer';dialog.className='medicine-drawer';dialog.setAttribute('aria-labelledby','medicine-drawer-title');
   dialog.innerHTML=`<div class="medicine-drawer-header"><div><span class="eyebrow">INVOICE MEDICINES</span><h2 id="medicine-drawer-title">Select medicines</h2><p>Choose medicines to add to this invoice.</p></div><button class="medicine-drawer-x" type="button" aria-label="Close medicine drawer">&times;</button></div>
+    <div id="medicine-drawer-total" role="status" hidden></div>
     <div class="medicine-drawer-search"><label for="medicine-drawer-search">Search medicines</label><input id="medicine-drawer-search" type="search" placeholder="Search by medicine name" autocomplete="off"></div>
     <div class="medicine-drawer-content"><p id="medicine-drawer-state" role="status"></p><button id="medicine-drawer-retry" class="secondary" type="button" hidden>Retry</button><div id="medicine-drawer-cards"></div></div>
     <div class="medicine-drawer-footer"><span id="medicine-drawer-count" role="status"></span><button class="primary medicine-drawer-close" type="button">Close</button></div>`;
@@ -15,6 +16,9 @@ export function initMedicineDrawer({api,fmt,getRows,addMedicine,removeMedicine})
     cards.querySelectorAll('input[type=checkbox]').forEach(input=>{input.checked=ids.has(input.dataset.medicineId);});
   }
   function render(){
+    const total=dialog.querySelector('#medicine-drawer-total');
+    total.hidden=loading||failed;
+    total.textContent=loading||failed?'':`Total medicines: ${medicines.length}`;
     cards.replaceChildren();retry.hidden=!failed;
     state.classList.toggle('error',failed||!!selectionError);
     if(loading){state.textContent='Loading medicines…';state.setAttribute('role','status');return;}
