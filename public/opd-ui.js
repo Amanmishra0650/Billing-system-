@@ -28,7 +28,7 @@ export function initOpd({$,api,esc,fmt,view,showInvoice,prepareInvoice,words}) {
         </div>
         <div class="panel-title spaced"><span class="number">03</span><h2>Consultation &amp; payment</h2></div>
         <div class="fields">
-          <label>Consultation fee (₹) <input name="consultation_fee" type="number" min="0" max="1000000" step="0.01" required placeholder="0.00"></label>
+          <label>Consultation fee (₹) <input name="consultation_fee" type="number" value="400" readonly required><small>Fixed consultation fee.</small></label>
           <label>Discount (%) <input name="discount_percent" type="number" min="0" max="100" step="0.01" value="0" required></label>
           <label>Payment status <select name="payment_status"><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select></label>
           <label id="opd-payment-mode-label" class="wide" hidden>Payment mode <select name="payment_mode">${modes}</select></label>

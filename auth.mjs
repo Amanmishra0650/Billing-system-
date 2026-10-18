@@ -11,7 +11,7 @@ export const hashToken = token => process.env.SESSION_SECRET ? createHmac('sha25
 export const cookieToken = req => req.headers.cookie?.match(/(?:^|;\s*)yogi_session=([a-f0-9]{64})(?:;|$)/)?.[1];
 export const sessionCookie = (token, age = 28800) => `yogi_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${age}${process.env.COOKIE_SECURE === '1' ? '; Secure' : ''}`;
 export async function seedAdmin(db,username,password) {
-  if (!username || typeof password !== 'string' || password.length<12 || password.length>256) throw new AppError('Provide an admin username and a password of 12 to 256 characters');
+  if (!username || typeof password !== 'string' || password.length<8 || password.length>256) throw new AppError('Provide an admin username and a password of 8 to 256 characters');
   return db.transaction(async tx => {
     await tx.exec('LOCK TABLE users IN EXCLUSIVE MODE');
     if ((await tx.query('SELECT id FROM users LIMIT 1')).rows.length) return false;

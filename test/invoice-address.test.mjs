@@ -29,7 +29,7 @@ test('OPD invoices preserve the selected clinic address on repeat saves',async()
   const user=(await db.query('SELECT id FROM users')).rows[0].id;
   const doctor=(await db.query('SELECT id FROM doctors LIMIT 1')).rows[0].id;
   const patient=await createPatient(db,{name:'OPD address test patient'});
-  const visit=await createVisit(db,{clinic_address_id:'munshipuliya',patient_id:patient.id,doctor_id:doctor,illness_code:'piles',consultation_fee_paise:10000,payment_status:'unpaid'},user);
+  const visit=await createVisit(db,{clinic_address_id:'munshipuliya',patient_id:patient.id,doctor_id:doctor,illness_code:'piles',consultation_fee_paise:40000,payment_status:'unpaid'},user);
   await assert.rejects(()=>invoiceFromVisit(db,visit.id,{},user),/select.*address/i);
   const first=await invoiceFromVisit(db,visit.id,{clinic_address_id:'priyadarshini'},user);
   const repeat=await invoiceFromVisit(db,visit.id,{clinic_address_id:'munshipuliya'},user);

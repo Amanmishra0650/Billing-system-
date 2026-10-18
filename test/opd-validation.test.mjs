@@ -2,7 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validatePatient, validateVisit, consultationTotal, ILLNESSES } from '../opd.mjs';
 
-const visit = { doctor_id: '11111111-1111-4111-8111-111111111111', illness_code: 'piles', consultation_fee_paise: 50000, payment_status: 'paid', payment_mode: 'CASH', visited_at: '2026-09-30T10:00:00.000Z' };
+const visit = { doctor_id: '11111111-1111-4111-8111-111111111111', illness_code: 'piles', consultation_fee_paise: 40000, payment_status: 'paid', payment_mode: 'CASH', visited_at: '2026-09-30T10:00:00.000Z' };
+test('new visits require the fixed INR 400 consultation fee', () => {
+  assert.equal(validateVisit(visit).consultation_fee_paise,40000);
+  for(const fee of [0,10000,39999,40001,50000]) {
+    assert.throws(()=>validateVisit({...visit,consultation_fee_paise:fee}),/fixed.*400/i);
+  }
+  const discounted=validateVisit({...visit,discount_percent:10});
+  assert.equal(consultationTotal(discounted.consultation_fee_paise,discounted.discount_bps),36000);
+});
 test('new consultation is tax-free and accepts percentage discounts', () => {
   assert.equal(consultationTotal(50000), 50000);
   assert.equal(validateVisit(visit).payment_mode, 'CASH');

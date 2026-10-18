@@ -34,7 +34,7 @@ Migration copies existing password hashes, so the same login works. Old sessions
 
 Doctors are seeded as database records: Dr. R. N Rathore, Dr. Aditi Maurya, and Dr. Atul Mishra. Deactivating a doctor removes them from new-visit options while preserving historical visits. Illness is stored per visit.
 
-New OPD consultations have no CGST or SGST. Enter Discount (%) from 0 to 100, with up to two decimal places. A consultation fee of ₹500 with 10% discount totals ₹450. Paid at registration records the discounted total received. The discount carries into the printed OPD slip and linked invoice; extra billing charges retain their existing taxes and remain outstanding. Historical visits and invoices preserve their original totals. Unpaid starts with zero received. OPD history displays the registration payment state; the linked invoice displays the current balance after subsequent payments or adjustments.
+New OPD consultations have a fixed, read-only fee of ?400, enforced by the server, and no CGST or SGST. Existing visits keep their saved fees. Enter Discount (%) from 0 to 100, with up to two decimal places. A consultation fee of ₹500 with 10% discount totals ₹450. Paid at registration records the discounted total received. The discount carries into the printed OPD slip and linked invoice; extra billing charges retain their existing taxes and remain outstanding. Historical visits and invoices preserve their original totals. Unpaid starts with zero received. OPD history displays the registration payment state; the linked invoice displays the current balance after subsequent payments or adjustments.
 
 ## Medicine Master
 

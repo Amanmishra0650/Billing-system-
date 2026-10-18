@@ -37,6 +37,7 @@ export function validateVisit(input) {
   const discount_bps=Math.round(discount*100);
   const fee = input.consultation_fee_paise;
   if (!Number.isSafeInteger(fee) || fee<0 || fee>100000000) invalid('consultation_fee_paise','Enter a valid consultation fee');
+  if (fee!==40000) invalid('consultation_fee_paise','Consultation fee is fixed at INR 400');
   if (!['paid','unpaid'].includes(input.payment_status)) invalid('payment_status','Select Paid or Unpaid payment status');
   const payment_mode = input.payment_status === 'paid' ? string(input.payment_mode,40) : null;
   if (input.payment_status === 'paid' && !PAYMENT_MODES.includes(payment_mode)) invalid('payment_mode','Select a payment mode for a paid visit');

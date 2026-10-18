@@ -31,10 +31,10 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await form.getByLabel('Address',{exact:true}).fill('Test area, Lucknow');
   await form.getByRole('combobox',{name:'Doctor',exact:true}).selectOption({label:'Dr. R. N Rathore'});
   await form.getByRole('combobox',{name:'Illness',exact:true}).selectOption('other');await form.getByLabel('Other illness').fill('Test follow-up');
-  await form.getByLabel('Consultation fee').fill('500');await form.getByRole('combobox',{name:'Payment status',exact:true}).selectOption('paid');
+  await expect(form.getByLabel('Consultation fee')).toHaveValue('400');await expect(form.getByLabel('Consultation fee')).toHaveAttribute('readonly','');await form.getByRole('combobox',{name:'Payment status',exact:true}).selectOption('paid');
   await expect(form.getByRole('combobox',{name:'Payment mode',exact:true})).toBeVisible();await form.getByRole('combobox',{name:'Payment mode',exact:true}).selectOption('UPI');
   await form.getByLabel('Discount (%)').fill('10');
-  await expect(page.locator('#opd-total')).toContainText('450.00');
+  await expect(page.locator('#opd-total')).toContainText('360.00');
   await expect(page.locator('#opd-editor')).not.toContainText('CGST');
   await expect(page.locator('#opd-editor')).not.toContainText('SGST');
   await page.evaluate(()=>window.scrollTo(0,0));
@@ -60,7 +60,7 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await expect(page.locator('#opd-detail')).toBeVisible();
   await expect.poll(()=>page.evaluate(()=>window.opdPrintSnapshots.length)).toBe(1);
   const automaticPrint=await page.evaluate(()=>window.opdPrintSnapshots[0]);
-  expect(automaticPrint.detailVisible).toBe(true);expect(automaticPrint.paper).toContain('Browser Test Patient');expect(automaticPrint.paper).toContain('450.00');expect(automaticPrint.paper).toMatch(/OPD-\d{6}/);
+  expect(automaticPrint.detailVisible).toBe(true);expect(automaticPrint.paper).toContain('Browser Test Patient');expect(automaticPrint.paper).toContain('360.00');expect(automaticPrint.paper).toMatch(/OPD-\d{6}/);
   expect(automaticPrint.paper).toContain('Priyadarshini Yojna');
   const uid=await page.locator('.uid-label').textContent();
   await expect(page.locator('#opd-detail')).toContainText('Test follow-up');
@@ -71,7 +71,7 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await page.emulateMedia({media:'print'});
   await expect(page.locator('#opd-paper')).toBeVisible();
   await expect(page.locator('#opd-paper')).toContainText('Browser Test Patient');
-  await expect(page.locator('#opd-paper')).toContainText('450.00');
+  await expect(page.locator('#opd-paper')).toContainText('360.00');
   await expect(page.locator('#opd-paper')).not.toContainText('CGST');
   await expect(page.locator('#opd-paper')).not.toContainText('SGST');
   await expect(page.locator('#detail')).toBeHidden();
@@ -81,11 +81,11 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await expect(page.locator('#invoice-opd-notice')).toBeVisible();
   await expect(page.locator('#invoice-form [name=patient_name]')).toHaveValue('Browser Test Patient');
   await expect(page.locator('#registration')).toHaveValue(uid);
-  await expect(page.locator('#opd-invoice-payment')).toContainText('450.00');
+  await expect(page.locator('#opd-invoice-payment')).toContainText('360.00');
   await expect(page.locator('.locked-charge .unit-price')).toBeDisabled();
   await page.getByRole('button',{name:'Save invoice',exact:true}).click();await page.locator('#invoice-address-dialog').getByRole('radio',{name:/Munshipuliya/}).check();await page.locator('#invoice-address-dialog').getByRole('button',{name:'Save invoice',exact:true}).click();
   await expect(page.locator('#detail')).toBeVisible();await expect(page.locator('#invoice-paper')).toContainText('Browser Test Patient');
-  await expect(page.locator('#invoice-paper')).toContainText('450.00');
+  await expect(page.locator('#invoice-paper')).toContainText('360.00');
   await expect(page.locator('#invoice-paper')).toContainText('Discount (10%)');
   await expect(page.locator('#invoice-paper')).not.toContainText('CGST');
   await expect(page.locator('#invoice-paper')).not.toContainText('SGST');
@@ -97,7 +97,7 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await page.getByLabel('Find a returning patient').fill('9876501234');await page.locator('.patient-match').click();
   await expect(page.locator('#selected-patient')).toContainText(uid);
   await form.getByRole('combobox',{name:'Doctor',exact:true}).selectOption({label:'Dr. Aditi Maurya'});await form.getByRole('combobox',{name:'Illness',exact:true}).selectOption('piles');
-  await form.getByLabel('Consultation fee').fill('500');
+  await expect(form.getByLabel('Consultation fee')).toHaveValue('400');await expect(form.getByLabel('Consultation fee')).toHaveAttribute('readonly','');
   await page.getByRole('button',{name:'Save OPD registration',exact:true}).click();
   await confirmOpdAddress(page,'Munshipuliya');
   await expect(page.locator('#opd-detail')).toBeVisible();
@@ -107,7 +107,7 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await expect(page.locator('#invoice-controls')).toHaveCount(0);
   await expect(page.getByRole('heading',{name:'Record a payment',exact:true})).toHaveCount(0);
   await expect(page.getByRole('heading',{name:'Invoice correction',exact:true})).toHaveCount(0);
-  await expect(page.locator('#invoice-paper')).toContainText('500.00');
+  await expect(page.locator('#invoice-paper')).toContainText('400.00');
   await page.getByRole('button',{name:'OPD',exact:true}).click();await page.getByRole('button',{name:'OPD history',exact:true}).click();await page.getByLabel('Search OPD visits').fill('Browser Test Patient');
   await expect(page.locator('#opd-rows tr')).toHaveCount(2);
   await page.locator('#opd-rows tr').last().getByRole('button',{name:'Open'}).click();

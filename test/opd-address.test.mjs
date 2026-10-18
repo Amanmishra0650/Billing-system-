@@ -13,7 +13,7 @@ test('OPD requires a clinic address and preserves it on the saved slip and histo
   const user=(await db.query('SELECT id FROM users')).rows[0].id;
   const doctor=(await db.query('SELECT id FROM doctors LIMIT 1')).rows[0].id;
   const patient=await createPatient(db,{name:'OPD address patient',address:'Patient home address'});
-  const input={patient_id:patient.id,doctor_id:doctor,illness_code:'piles',consultation_fee_paise:10000,payment_status:'unpaid'};
+  const input={patient_id:patient.id,doctor_id:doctor,illness_code:'piles',consultation_fee_paise:40000,payment_status:'unpaid'};
   for(const id of [undefined,null,'',{},'unknown'])await assert.rejects(()=>createVisit(db,{...input,clinic_address_id:id},user),/select.*address/i);
   assert.equal((await db.query('SELECT count(*)::int AS n FROM opd_visits')).rows[0].n,0);
   for(const clinic of CLINIC_ADDRESSES){

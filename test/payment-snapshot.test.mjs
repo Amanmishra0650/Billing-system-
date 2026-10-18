@@ -10,7 +10,7 @@ test('OPD invoice balance remains consistent when a payment and adjustment occur
     await seedAdmin(db,'test','test-password-only');
     const user=(await db.query('SELECT id FROM users')).rows[0].id, doctor=(await db.query('SELECT id FROM doctors LIMIT 1')).rows[0].id;
     const patient=await createPatient(db,{name:'Synthetic patient'});
-    const visit=await createVisit(db,{clinic_address_id:'munshipuliya',patient_id:patient.id,doctor_id:doctor,illness_code:'piles',consultation_fee_paise:10000,payment_status:'unpaid'},user);
+    const visit=await createVisit(db,{clinic_address_id:'munshipuliya',patient_id:patient.id,doctor_id:doctor,illness_code:'piles',consultation_fee_paise:40000,payment_status:'unpaid'},user);
     const {invoice}=await invoiceFromVisit(db,visit.id,{clinic_address_id:'munshipuliya'},user);
     let injected=false;
     const reader={query:async(sql,args)=>{
@@ -24,7 +24,7 @@ test('OPD invoice balance remains consistent when a payment and adjustment occur
     }};
     const observed=(await getVisit(reader,visit.id)).invoice;
     assert.equal(injected,true);
-    assert.equal(observed.received_paise,0);assert.equal(observed.balance_paise,10000);
+    assert.equal(observed.received_paise,0);assert.equal(observed.balance_paise,40000);
     assert.equal((await getInvoice(db,invoice.id)).received_paise,0);
   } finally {await db.close();}
 });
