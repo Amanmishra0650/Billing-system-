@@ -173,3 +173,8 @@ button:focus-visible{outline:3px solid #70a393;outline-offset:3px}.nav:hover,.su
 .medicine-drawer-footer .primary{font-size:15px}
 @media screen and (max-width:600px){.medicine-drawer{width:100vw;border-left:0}.medicine-drawer-header{padding-top:max(20px,env(safe-area-inset-top))}}
 @media print{.medicine-drawer{display:none!important}}
+
+/* Keep the amount label above a value box matching the charge inputs. */
+#items .line-total{display:flex;flex-direction:column;justify-content:flex-start;gap:7px;height:auto;min-width:0;padding:0;background:transparent;border:0;border-radius:0;align-self:start;text-align:left}
+#items .line-total span{margin:0;line-height:14px;font-size:10px;font-weight:600}
+#items .line-total strong{display:flex;align-items:center;justify-content:flex-end;min-height:33px;margin:0;padding:7px 10px;border:1px solid var(--line);border-radius:4px;background:#f0f5ec;font-size:13px;line-height:17px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;white-space:normal}
