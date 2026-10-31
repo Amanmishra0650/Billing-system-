@@ -20,11 +20,15 @@ test('authenticated OPD workflow, patient reuse, invoice linking, and billing re
   assert.equal((await request('/api/doctors')).status,401);
   const login = await request('/api/login','POST',{username:'test',password:'test-password-only'});
   assert.equal(login.status,200); cookie = login.cookie.split(';')[0];
+  await db.exec('DROP TABLE patient_uhid_counter');
+  assert.deepEqual((await request('/api/registration-preview')).value,{registration:'2011162'});
+  assert.deepEqual((await request('/api/registration-preview')).value,{registration:'2011162'});
   const doctors = (await request('/api/doctors')).value;
   assert.equal(doctors.length,3);
   for (const name of ['Dr. R. N Rathore','Dr. Aditi Maurya','Dr. Atul Mishra']) assert.ok(doctors.some(doctor=>doctor.name===name));
   const patient = (await request('/api/patients','POST',{name:'Test Patient',mobile:'9876543210',age:'40',gender:'Female',address:'Test address'})).value;
   assert.equal(patient.patient_uid,'2011162');
+  assert.deepEqual((await request('/api/registration-preview')).value,{registration:'2011163'});
   const duplicate = await request('/api/patients','POST',{name:'Test Patient',mobile:'9876543210'});
   assert.equal(duplicate.status,409); assert.equal(duplicate.value.matches[0].id,patient.id);
   const input = {clinic_address_id:'munshipuliya',patient_id:patient.id,doctor_id:doctors[0].id,illness_code:'piles',consultation_fee_paise:40000,payment_status:'paid',payment_mode:'CASH'};

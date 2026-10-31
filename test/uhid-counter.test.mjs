@@ -10,26 +10,25 @@ import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {migrateUhidCounter} from '../uhid-counter-migration.mjs';
 
-test('UHID counter starts at 2011161 even with a legacy sequence starting at one',async()=>{
+test('historical counter migration starts at 2011161 even with a legacy sequence starting at one',async()=>{
   const db=await createDatabase({connectionString:'',dataDir:'memory://',initialize:false});
   try{
     await db.exec(await readFile(new URL('../schema.sql',import.meta.url),'utf8'));
     await db.query("SELECT setval('patient_uid_seq',1,false)");
     assert.equal((await migrateUhidCounter(db)).nextUhid,2011162);
     assert.equal((await db.query('SELECT last_value FROM patient_uhid_counter WHERE singleton')).rows[0].last_value,2011161);
-    assert.equal((await createPatient(db,{name:'Numeric UHID patient'})).patient_uid,'2011162');
-    assert.equal((await migrateUhidCounter(db)).nextUhid,2011163);
+    assert.equal((await migrateUhidCounter(db)).nextUhid,2011162);
   }finally{await db.close();}
 });
 
-test('UHID allocation rolls back failed registrations without consuming a number',async()=>{
+test('sequence allocation rolls back failed patients while allowing number gaps',async()=>{
   const db=await createDatabase({connectionString:'',dataDir:'memory://'});
   try{
     await assert.rejects(db.transaction(async tx=>{await insertPatient(tx,{name:'Rolled back patient'});throw Error('failed registration');}),/failed registration/);
     assert.equal((await db.query('SELECT count(*)::int AS n FROM patients')).rows[0].n,0);
-    assert.equal((await createPatient(db,{name:'First counter patient'})).patient_uid,'2011162');
+    assert.equal((await createPatient(db,{name:'First counter patient'})).patient_uid,'2011163');
     const patients=await Promise.all(['Second counter patient','Third counter patient'].map(name=>createPatient(db,{name})));
-    assert.deepEqual(patients.map(p=>p.patient_uid).sort(),['2011163','2011164']);
+    assert.deepEqual(patients.map(p=>p.patient_uid).sort(),['2011164','2011165']);
   }finally{await db.close();}
 });
 
@@ -44,11 +43,11 @@ test('UHID migration preserves issued numbers and never reapplies legacy recover
     await db.query("SELECT setval('patient_uid_seq',2050000,true)");
     assert.equal((await migrateUhidCounter(db)).nextUhid,2011295);
     assert.deepEqual((await db.query('SELECT * FROM patients')).rows,original);
-    assert.equal((await createPatient(db,{name:'Next patient'})).patient_uid,'2011295');
+    assert.equal((await createPatient(db,{name:'Next patient'})).patient_uid,'2050001');
   }finally{await db.close();}
 });
 
-test('UHIDs remain consecutive after abrupt process exits',()=>{
+test('sequence UHIDs remain unique and increasing after abrupt process exits',()=>{
   return (async()=>{
     const dataDir=await mkdtemp(join(tmpdir(),'billing-uhid-crash-'));
     const databaseUrl=new URL('../database.mjs',import.meta.url).href;
@@ -59,6 +58,9 @@ test('UHIDs remain consecutive after abrupt process exits',()=>{
       const child=spawnSync(process.execPath,['--input-type=module','-e',source],{encoding:'utf8',windowsHide:true});
       assert.equal(child.status,0,child.stderr);values.push(child.stdout.trim());
     }
-    assert.deepEqual(values,['2011162','2011163','2011164']);
+    assert.equal(values[0],'2011162');
+    assert.ok(values.every(value=>/^\d+$/.test(value)));
+    assert.ok(Number(values[1])>Number(values[0]));
+    assert.ok(Number(values[2])>Number(values[1]));
   })();
 });

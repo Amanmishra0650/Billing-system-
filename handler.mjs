@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { AppError, ILLNESSES } from './opd.mjs';
 import { authenticate, login, cookieToken, hashToken, sessionCookie, checkProductionConfig } from './auth.mjs';
-import { getInvoice, listInvoices, changeInvoice, numbered } from './billing.mjs';
+import { getInvoice, listInvoices, changeInvoice } from './billing.mjs';
 import { findPatients, createPatient, createVisit, getVisit, listVisits, invoiceFromVisit } from './opd-service.mjs';
 import { createMedicine,listMedicines,getMedicine,updateMedicine,setMedicineStatus } from './medicines.mjs';
 import {createStandaloneInvoice} from './invoice-patients.mjs';
@@ -58,7 +58,7 @@ export function createHandler(db) {
         if(visit && req.method==='GET' && !visit[2]) return json(res,200,await getVisit(db,visit[1]));
         if(visit && req.method==='POST' && visit[2]) { const result=await invoiceFromVisit(db,visit[1],await body(req),user_id); return json(res,result.created?201:200,result.invoice); }
         if(path==='/api/registration-preview'&&req.method==='GET') {
-          const seq=(await db.query('SELECT last_value+1 AS n FROM patient_uhid_counter WHERE singleton')).rows[0]; return json(res,200,{registration:numbered('YPC-UID-',seq.n)});
+          const seq=(await db.query('SELECT CASE WHEN is_called THEN last_value+1 ELSE last_value END AS n FROM public.patient_uid_seq')).rows[0]; return json(res,200,{registration:String(seq.n)});
         }
         if(path==='/api/invoices'&&req.method==='GET') return json(res,200,await listInvoices(db,url.searchParams.get('q')));
         if(path==='/api/invoices'&&req.method==='POST') return json(res,201,await createStandaloneInvoice(db,await body(req),user_id));

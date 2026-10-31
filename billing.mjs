@@ -5,7 +5,7 @@ import { invoiceTotals } from './public/invoice-totals.js';
 import { CLINIC_ADDRESSES } from './public/clinic-addresses.js';
 import {nextPatientNumber} from './patient-numbering.mjs';
 export const numbered = (prefix,id) => prefix==='YPC-UID-' ? String(id) : `${prefix}${String(id).padStart(prefix==='OPD-'?4:6,'0')}`;
-export async function nextUid(tx) { return numbered('YPC-UID-',await nextPatientNumber(tx)); }
+export async function nextUid(tx) { return String(await nextPatientNumber(tx)); }
 export async function audit(tx,action,{invoice_id=null,opd_visit_id=null,user_id=null,details=''}={}) {
   await tx.query('INSERT INTO audit_log(invoice_id,opd_visit_id,user_id,action,details,created_at) VALUES($1,$2,$3,$4,$5,$6)',[invoice_id,opd_visit_id,user_id,action,details,new Date().toISOString()]);
 }

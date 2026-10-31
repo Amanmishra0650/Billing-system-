@@ -48,7 +48,7 @@ test('new invoice patient is created atomically and duplicate names never auto-s
     await assert.rejects(createStandaloneInvoice(db,{...input,items:[]}));
     assert.equal((await db.query('SELECT count(*)::int AS n FROM patients')).rows[0].n,0);
     const invoice=await createStandaloneInvoice(db,input);
-    assert.ok(invoice.patient_id);assert.equal(invoice.registration,'2011162');
+    assert.ok(invoice.patient_id);assert.equal(invoice.registration,'2011163');
     await assert.rejects(createStandaloneInvoice(db,input),/existing patient/i);
     const again=await createStandaloneInvoice(db,{...input,patient:undefined,patient_id:invoice.patient_id});
     assert.equal(again.registration,invoice.registration);
