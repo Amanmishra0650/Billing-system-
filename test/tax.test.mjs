@@ -26,11 +26,11 @@ test('new invoices enforce 9% CGST and 9% SGST and preserve saved totals', async
     const headers = { 'Content-Type': 'application/json', Cookie: login.headers.get('set-cookie').split(';')[0] };
     for (const rate of [undefined, 250, 0]) {
       const preview = await (await fetch(`${base}/api/registration-preview`, { headers })).json();
-      assert.match(preview.registration, /^YPC-UID-\d{6}$/);
-      const response = await fetch(`${base}/api/invoices`, { method: 'POST', headers, body: JSON.stringify({ clinic_address_id: 'munshipuliya', patient_name: 'Test only', payment_mode: 'CASH', paid_paise: 0, tax_rate_bps: rate, items: [{ description: 'Service', quantity: 1, unit_price_paise: 100000, type: 'Service' }] }) });
+      assert.match(preview.registration, /^\d{7,}$/);
+      const response = await fetch(`${base}/api/invoices`, { method: 'POST', headers, body: JSON.stringify({ clinic_address_id: 'munshipuliya', patient_name: `Test only ${rate}`, payment_mode: 'CASH', paid_paise: 0, tax_rate_bps: rate, items: [{ description: 'Service', quantity: 1, unit_price_paise: 100000, type: 'Service' }] }) });
       assert.equal(response.status, 201);
       const invoice = await response.json();
-      assert.equal(invoice.registration, `YPC-UID-${String(invoice.id).padStart(6, '0')}`);
+      assert.equal(invoice.registration, String(2011161 + invoice.id));
       assert.equal(invoice.registration, preview.registration);
       assert.equal(invoice.tax_rate_bps, 900);
       assert.equal(invoice.cgst_paise, 9000);

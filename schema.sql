@@ -1,4 +1,4 @@
-CREATE SEQUENCE IF NOT EXISTS patient_uid_seq;
+CREATE SEQUENCE IF NOT EXISTS patient_uid_seq START WITH 2011162;
 CREATE SEQUENCE IF NOT EXISTS opd_number_seq;
 CREATE TABLE IF NOT EXISTS users (id BIGSERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, salt TEXT NOT NULL, hash TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id), expires_at BIGINT NOT NULL);
@@ -52,6 +52,8 @@ ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discount_paise BIGINT NOT NULL DEF
 -- A snapshot preserves the issued clinic address; legacy invoices retain their original printed address.
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS clinic_address TEXT;
 ALTER TABLE opd_visits ADD COLUMN IF NOT EXISTS clinic_address TEXT;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS patient_mobile TEXT NOT NULL DEFAULT '';
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS patient_address TEXT NOT NULL DEFAULT '';
 
 -- Retired doctors stay linked to historical visits but cannot receive new visits.
 UPDATE doctors SET active=false

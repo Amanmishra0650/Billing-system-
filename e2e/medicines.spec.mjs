@@ -43,6 +43,7 @@ test('medicine master edit/status/search and searchable invoice autofill preserv
   await page.locator('#medicine-list').getByLabel('Search medicines').fill('trip');await expect(page.locator('#medicine-rows tr')).toHaveCount(1);
   await page.getByRole('button',{name:'Invoices',exact:true}).click();await page.getByRole('button',{name:'New invoice',exact:true}).click();
   await page.locator('#invoice-form [name=patient_name]').fill('Medicine Browser Patient');
+  await page.getByRole('button',{name:'Create new patient: Medicine Browser Patient',exact:true}).click();
   const row=page.locator('#items .item-row').first();
   await row.locator('.description').press('Enter');
   const drawer=page.getByRole('dialog',{name:'Select medicines',exact:true});

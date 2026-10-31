@@ -3,8 +3,9 @@ import { AppError, invalid, string, PAYMENT_MODES } from './opd.mjs';
 import { resolveMedicineItems } from './medicines.mjs';
 import { invoiceTotals } from './public/invoice-totals.js';
 import { CLINIC_ADDRESSES } from './public/clinic-addresses.js';
-export const numbered = (prefix,id) => `${prefix}${String(id).padStart(6,'0')}`;
-export async function nextUid(tx) { return numbered('YPC-UID-',(await tx.query("SELECT nextval('patient_uid_seq') AS n")).rows[0].n); }
+import {nextPatientNumber} from './patient-numbering.mjs';
+export const numbered = (prefix,id) => prefix==='YPC-UID-' ? String(id) : `${prefix}${String(id).padStart(prefix==='OPD-'?4:6,'0')}`;
+export async function nextUid(tx) { return numbered('YPC-UID-',await nextPatientNumber(tx)); }
 export async function audit(tx,action,{invoice_id=null,opd_visit_id=null,user_id=null,details=''}={}) {
   await tx.query('INSERT INTO audit_log(invoice_id,opd_visit_id,user_id,action,details,created_at) VALUES($1,$2,$3,$4,$5,$6)',[invoice_id,opd_visit_id,user_id,action,details,new Date().toISOString()]);
 }
@@ -41,8 +42,8 @@ export async function insertInvoice(tx,input,{patient_id=null,opd_visit_id=null,
   const resolved=await resolveMedicineItems(tx,input.items);
   const v=validateInvoice({...input,items:resolved},consultation);
   registration ||= await nextUid(tx);
-  const columns=['created_at','patient_name','age','gender','registration','payment_mode','paid_paise','tax_rate_bps','subtotal_paise','cgst_paise','sgst_paise','total_paise','patient_id','opd_visit_id','discount_bps','discount_paise','clinic_address'];
-  const values=[new Date().toISOString(),v.patient_name,v.age,v.gender,registration,v.payment_mode,v.paid_paise,v.tax_rate_bps,v.subtotal_paise,v.cgst_paise,v.sgst_paise,v.total_paise,patient_id,opd_visit_id,v.discount_bps,v.discount_paise,clinic.address];
+  const columns=['created_at','patient_name','age','gender','registration','payment_mode','paid_paise','tax_rate_bps','subtotal_paise','cgst_paise','sgst_paise','total_paise','patient_id','opd_visit_id','discount_bps','discount_paise','clinic_address','patient_mobile','patient_address'];
+  const values=[new Date().toISOString(),v.patient_name,v.age,v.gender,registration,v.payment_mode,v.paid_paise,v.tax_rate_bps,v.subtotal_paise,v.cgst_paise,v.sgst_paise,v.total_paise,patient_id,opd_visit_id,v.discount_bps,v.discount_paise,clinic.address,string(input.patient_mobile,20),string(input.patient_address,300)];
   const row=(await tx.query(`INSERT INTO invoices(${columns.join(',')}) VALUES(${values.map((_,i)=>'$'+(i+1)).join(',')}) RETURNING id`,values)).rows[0];
   await tx.query('UPDATE invoices SET invoice_number=$1 WHERE id=$2',[numbered('YPC-',row.id),row.id]);
   for (const [position,item] of v.items.entries()) await tx.query('INSERT INTO invoice_items(invoice_id,position,type,description,quantity,unit_price_paise,amount_paise,medicine_id,medicine_name,tax_percentage,tax_amount_paise,final_amount_paise) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[row.id,position,item.type,item.description,item.quantity,item.unit_price_paise,item.amount_paise,item.medicine_id||null,item.medicine_name||null,item.tax_percentage??null,item.tax_amount_paise??null,item.final_amount_paise??null]);

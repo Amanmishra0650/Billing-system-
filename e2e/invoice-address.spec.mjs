@@ -26,6 +26,7 @@ for(const clinic of [
   await page.getByRole('button',{name:'Sign in',exact:true}).click();
   const form=page.locator('#invoice-form'),name=`Address browser patient ${clinic.id}`;
   await form.locator('[name=patient_name]').fill(name);
+  await page.getByRole('button',{name:'Create new patient: '+name,exact:true}).click();
   await form.locator('.item-type').first().selectOption('Service');
   await form.locator('.description').first().fill('Synthetic consultation');
   await form.locator('.unit-price').first().fill('100');

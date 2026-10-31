@@ -18,6 +18,7 @@ async function login(page){await page.goto(base);await page.getByLabel('Username
 test('drawer multi-selection stays synchronized and invoice saves/reopens with database snapshots',async({page},testInfo)=>{
   test.setTimeout(60000);const errors=[];page.on('pageerror',e=>errors.push(e.message));await login(page);
   await page.locator('#invoice-form [name=patient_name]').fill('Drawer synthetic patient');
+  await page.getByRole('button',{name:'Create new patient: Drawer synthetic patient',exact:true}).click();
   await page.locator('#items .description').click();const drawer=page.getByRole('dialog',{name:'Select medicines',exact:true});await expect(drawer).toBeVisible();
   const desktop=await drawer.boundingBox();expect(Math.round(desktop.width)).toBe(520);expect(Math.round(desktop.x)).toBe(page.viewportSize().width-520);
   await expect(drawer.getByRole('checkbox')).toHaveCount(2);await expect(drawer).not.toContainText('Inactive Drawer Tablet');await expect(drawer).toContainText('100.00');

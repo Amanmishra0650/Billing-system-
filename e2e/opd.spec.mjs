@@ -11,6 +11,7 @@ async function confirmOpdAddress(page,name='Priyadarshini Yojna'){
 }
 test.beforeAll(async()=>{
   db=await createDatabase({connectionString:'',dataDir:'memory://'});await seedAdmin(db,'test','test-password-only');
+  await db.query("SELECT setval('opd_number_seq',100,false)");
   server=http.createServer(createHandler(db));await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base=`http://127.0.0.1:${server.address().port}`;
 });
 test.afterAll(async()=>{if(server){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}if(db)await db.close();});
@@ -18,12 +19,14 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   // This full workflow creates visits/invoices and exports PDFs on Windows.
   test.setTimeout(60000);
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.addInitScript(()=>{window.opdPrintSnapshots=[];window.print=()=>window.opdPrintSnapshots.push({paper:document.querySelector('#opd-paper')?.textContent,detailVisible:!document.querySelector('#opd-detail')?.hidden});});
+  await page.addInitScript(()=>{window.opdPrintSnapshots=[];window.print=()=>window.opdPrintSnapshots.push({title:document.title,paper:document.querySelector('#opd-paper')?.textContent,detailVisible:!document.querySelector('#opd-detail')?.hidden});});
   await page.goto(base);
   await page.getByLabel('Username').fill('test');await page.getByLabel('Password').fill('test-password-only');await page.getByRole('button',{name:'Sign in',exact:true}).click();
   await expect(page.locator('#workspace')).toBeVisible();
   await page.getByRole('button',{name:'OPD',exact:true}).click();
   const form=page.locator('#opd-form');
+  await expect(form.getByLabel('UHID Number',{exact:true})).toHaveValue('2011162');
+  await expect(form.getByLabel('UHID Number',{exact:true})).toHaveAttribute('readonly','');
   await expect(form.getByRole('combobox',{name:'Doctor',exact:true}).locator('option')).toHaveCount(4);
   await form.getByLabel('Patient name').fill('Browser Test Patient');
   await form.getByLabel('Mobile number').fill('9876501234');
@@ -60,14 +63,19 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await expect(page.locator('#opd-detail')).toBeVisible();
   await expect.poll(()=>page.evaluate(()=>window.opdPrintSnapshots.length)).toBe(1);
   const automaticPrint=await page.evaluate(()=>window.opdPrintSnapshots[0]);
-  expect(automaticPrint.detailVisible).toBe(true);expect(automaticPrint.paper).toContain('Browser Test Patient');expect(automaticPrint.paper).toContain('360.00');expect(automaticPrint.paper).toMatch(/OPD-\d{6}/);
+  expect(automaticPrint.detailVisible).toBe(true);expect(automaticPrint.paper).toContain('Browser Test Patient');expect(automaticPrint.paper).toContain('360.00');expect(automaticPrint.paper).toMatch(/OPD-\d{3,}/);
+  expect(automaticPrint.paper).toContain('UHID Number');expect(automaticPrint.paper).toContain('2011162');
+  expect(automaticPrint.title).toBe('Browser Test Patient');
+  await expect(page.locator('#opd-paper .invoice-right .opd-identifiers')).toHaveText('UHID Number: 2011162OPD Number: OPD-001');
+  await expect(page.locator('#opd-detail')).not.toContainText('Permanent ID');
+  expect(await page.locator('#opd-paper .invoice-logo').evaluate(image=>image.complete&&image.naturalWidth>0)).toBe(true);
   expect(automaticPrint.paper).toContain('Priyadarshini Yojna');
   const uid=await page.locator('.uid-label').textContent();
   await expect(page.locator('#opd-detail')).toContainText('Test follow-up');
   await expect(page.getByRole('button',{name:'Print OPD / Save as PDF',exact:true})).toBeVisible();
   await page.evaluate(()=>{window.print=()=>{window.printCalled=true;};});
   await page.getByRole('button',{name:'Print OPD / Save as PDF',exact:true}).click();
-  expect(await page.evaluate(()=>window.printCalled)).toBe(true);
+  await expect.poll(()=>page.evaluate(()=>window.printCalled)).toBe(true);
   await page.emulateMedia({media:'print'});
   await expect(page.locator('#opd-paper')).toBeVisible();
   await expect(page.locator('#opd-paper')).toContainText('Browser Test Patient');
@@ -75,6 +83,7 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await expect(page.locator('#opd-paper')).not.toContainText('CGST');
   await expect(page.locator('#opd-paper')).not.toContainText('SGST');
   await expect(page.locator('#detail')).toBeHidden();
+  await page.screenshot({path:testInfo.outputPath('opd-print.png'),fullPage:true});
   await page.pdf({path:testInfo.outputPath('opd-registration.pdf'),format:'A4',printBackground:true});
   await page.emulateMedia({media:'screen'});
   await page.getByRole('button',{name:'Create invoice',exact:true}).click();
@@ -94,8 +103,10 @@ test('OPD registration, returning patient, invoice prefill, save and print',asyn
   await page.screenshot({path:testInfo.outputPath('invoice-print.png'),fullPage:true});
   await page.pdf({path:testInfo.outputPath('opd-invoice.pdf'),format:'A4',printBackground:true});await page.emulateMedia({media:'screen'});
   await page.getByRole('button',{name:'OPD',exact:true}).click();await page.getByRole('button',{name:'New OPD registration',exact:true}).click();
+  await expect(form.getByLabel('UHID Number',{exact:true})).toHaveValue('2011163');
   await page.getByLabel('Find a returning patient').fill('9876501234');await page.locator('.patient-match').click();
   await expect(page.locator('#selected-patient')).toContainText(uid);
+  await expect(form.getByLabel('UHID Number',{exact:true})).toHaveValue(uid);
   await form.getByRole('combobox',{name:'Doctor',exact:true}).selectOption({label:'Dr. Aditi Maurya'});await form.getByRole('combobox',{name:'Illness',exact:true}).selectOption('piles');
   await expect(form.getByLabel('Consultation fee')).toHaveValue('400');await expect(form.getByLabel('Consultation fee')).toHaveAttribute('readonly','');
   await page.getByRole('button',{name:'Save OPD registration',exact:true}).click();

@@ -31,7 +31,7 @@ test('SQLite migration preserves issued records, payments and hashes, verifies t
   assert.equal(invoice.invoice_number,'YPC-000007');assert.equal(invoice.registration,'YPC-UID-000120');
   assert.equal(invoice.received_paise,59000); assert.equal(invoice.items[0].quantity,1);assert.equal(invoice.payments[0].id,3);
   assert.equal((await db.query('SELECT hash FROM users')).rows[0].hash,'hash');
-  assert.equal((await createPatient(db,{name:'New Test'})).patient_uid,'YPC-UID-000121');
+  assert.equal((await createPatient(db,{name:'New Test'})).patient_uid,'2011162');
   await assert.rejects(()=>migrateSqlite(db,source,join(dir,'backups')),/empty/i);
   assert.equal((await db.query('SELECT count(*)::int AS n FROM invoices')).rows[0].n,1);
 });

@@ -21,5 +21,8 @@ for(const match of html.matchAll(/(?:src|href)="\/(?!\/)([^"?#]+)"/g))await acce
 const config=JSON.parse(await readFile(resolve(root,'vercel.json'),'utf8'));
 if(config.outputDirectory!=='public')throw Error('Expected production static output directory public');
 await access(resolve(root,'migrations/2026-10-13-medicines.sql'));
+await access(resolve(root,'migrations/2026-11-01-daily-opd.sql'));
+await access(resolve(root,'migrations/2026-11-01-invoice-patient-snapshots.sql'));
+await access(resolve(root,'migrations/2026-11-01-uhid-counter.sql'));
 console.log(`Production verification passed: ${files.length} JavaScript modules, local imports, HTML assets, migration, and Vercel static output.`);
 console.log('Deployable frontend: public/ (served directly; no bundling step required).');

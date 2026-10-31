@@ -50,8 +50,9 @@ export async function migrateSqlite(db,sourcePath,backupDirectory='backups') {
       const max=Math.max(0,...records[table].map(row=>row.id));
       await tx.query(`SELECT setval(pg_get_serial_sequence('${table}','id'),$1,$2)`,[Math.max(1,max),max>0]);
     }
-    const uidMax=records.invoices.reduce((max,row)=>{const match=row.registration?.match(/^YPC-UID-(\d+)$/);return Math.max(max,match?Number(match[1]):0);},0);
-    await tx.query("SELECT setval('patient_uid_seq',$1,$2)",[Math.max(1,uidMax),uidMax>0]);
+    const uidMax=records.invoices.reduce((max,row)=>{const match=row.registration?.match(/^(?:YPC-UID-)?(\d+)$/);return Math.max(max,match?Number(match[1]):0);},0);
+    await tx.query("SELECT setval('patient_uid_seq',$1,$2)",[Math.max(2011162,uidMax),uidMax>=2011162]);
+    await tx.query('UPDATE patient_uhid_counter SET last_value=GREATEST(last_value,$1) WHERE singleton',[uidMax]);
     return {backup,counts:Object.fromEntries(tables.map(table=>[table,records[table].length])),invoice_items:items.length,totals:expected};
   });
 }

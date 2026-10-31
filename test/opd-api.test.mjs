@@ -24,7 +24,7 @@ test('authenticated OPD workflow, patient reuse, invoice linking, and billing re
   assert.equal(doctors.length,3);
   for (const name of ['Dr. R. N Rathore','Dr. Aditi Maurya','Dr. Atul Mishra']) assert.ok(doctors.some(doctor=>doctor.name===name));
   const patient = (await request('/api/patients','POST',{name:'Test Patient',mobile:'9876543210',age:'40',gender:'Female',address:'Test address'})).value;
-  assert.match(patient.patient_uid,/^YPC-UID-\d{6}$/);
+  assert.equal(patient.patient_uid,'2011162');
   const duplicate = await request('/api/patients','POST',{name:'Test Patient',mobile:'9876543210'});
   assert.equal(duplicate.status,409); assert.equal(duplicate.value.matches[0].id,patient.id);
   const input = {clinic_address_id:'munshipuliya',patient_id:patient.id,doctor_id:doctors[0].id,illness_code:'piles',consultation_fee_paise:40000,payment_status:'paid',payment_mode:'CASH'};
@@ -32,6 +32,7 @@ test('authenticated OPD workflow, patient reuse, invoice linking, and billing re
   const first = await request('/api/opd-visits','POST',input);
   assert.equal(first.status,201);
   const visit = first.value;
+  assert.equal(visit.opd_number,'OPD-0001');
   const second = (await request('/api/opd-visits','POST',{...input,illness_code:'other',custom_illness:'Follow-up concern',payment_status:'unpaid'})).value;
   assert.notEqual(second.opd_number,visit.opd_number); assert.equal(second.patient_uid,visit.patient_uid);
   assert.equal((await request('/api/opd-visits?q=9876543210')).value.length,2);

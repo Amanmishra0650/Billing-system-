@@ -1,9 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { AppError, ILLNESSES } from './opd.mjs';
 import { authenticate, login, cookieToken, hashToken, sessionCookie, checkProductionConfig } from './auth.mjs';
-import { getInvoice, insertInvoice, listInvoices, changeInvoice, numbered } from './billing.mjs';
+import { getInvoice, listInvoices, changeInvoice, numbered } from './billing.mjs';
 import { findPatients, createPatient, createVisit, getVisit, listVisits, invoiceFromVisit } from './opd-service.mjs';
 import { createMedicine,listMedicines,getMedicine,updateMedicine,setMedicineStatus } from './medicines.mjs';
+import {createStandaloneInvoice} from './invoice-patients.mjs';
 
 const json=(res,status,value)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(value));};
 async function body(req) {
@@ -57,10 +58,10 @@ export function createHandler(db) {
         if(visit && req.method==='GET' && !visit[2]) return json(res,200,await getVisit(db,visit[1]));
         if(visit && req.method==='POST' && visit[2]) { const result=await invoiceFromVisit(db,visit[1],await body(req),user_id); return json(res,result.created?201:200,result.invoice); }
         if(path==='/api/registration-preview'&&req.method==='GET') {
-          const seq=(await db.query('SELECT last_value,is_called FROM patient_uid_seq')).rows[0]; return json(res,200,{registration:numbered('YPC-UID-',seq.is_called?seq.last_value+1:seq.last_value)});
+          const seq=(await db.query('SELECT last_value+1 AS n FROM patient_uhid_counter WHERE singleton')).rows[0]; return json(res,200,{registration:numbered('YPC-UID-',seq.n)});
         }
         if(path==='/api/invoices'&&req.method==='GET') return json(res,200,await listInvoices(db,url.searchParams.get('q')));
-        if(path==='/api/invoices'&&req.method==='POST') { const input=await body(req); return json(res,201,await db.transaction(tx=>insertInvoice(tx,input,{user_id}))); }
+        if(path==='/api/invoices'&&req.method==='POST') return json(res,201,await createStandaloneInvoice(db,await body(req),user_id));
         const invoice=path.match(/^\/api\/invoices\/(\d+)(?:\/(payments|payment-status|void))?$/);
         if(invoice && Number.isSafeInteger(Number(invoice[1]))) {
           if(req.method==='GET'&&!invoice[2]) return json(res,200,await db.transaction(tx=>getInvoice(tx,Number(invoice[1]),{lock:true})));
@@ -70,6 +71,8 @@ export function createHandler(db) {
       }
       const assets={'/':'index.html','/index.html':'index.html','/app.js':'app.js','/opd-ui.js':'opd-ui.js','/opd-print.js':'opd-print.js','/invoice-totals.js':'invoice-totals.js','/medicines-ui.js':'medicines-ui.js','/medicine-picker.js':'medicine-picker.js','/medicine-drawer.js':'medicine-drawer.js','/styles.css':'styles.css','/logo.png':'logo.png'};
       assets['/clinic-addresses.js']='clinic-addresses.js';
+      assets['/print-ready.js']='print-ready.js';
+      assets['/invoice-patients.js']='invoice-patients.js';
       assets['/invoice-address.js']='invoice-address.js';
       if (req.method!=='GET'||!assets[path]) throw new AppError('Not found',404);
       const file=assets[path], types={html:'text/html; charset=utf-8',js:'text/javascript; charset=utf-8',css:'text/css; charset=utf-8',png:'image/png'};

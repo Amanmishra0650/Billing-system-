@@ -1,4 +1,6 @@
 import { initOpd } from './opd-ui.js';
+import {initInvoicePatients} from './invoice-patients.js';
+import { printPaper } from './print-ready.js';
 import { initMedicines } from './medicines-ui.js';
 import { attachMedicinePicker,setMedicineRow } from './medicine-picker.js';
 import { initMedicineDrawer } from './medicine-drawer.js';
@@ -30,16 +32,10 @@ async function api(path, opts = {}) {
   if (!r.ok) { const error = Error(d.error || "Request failed"); error.fields=d.fields; error.matches=d.matches; error.status=r.status; throw error; }
   return d;
 }
+const invoicePatients=initInvoicePatients({form:$('invoice-form'),api,esc,isLinked:()=>Boolean(linkedVisit)});
 async function fillRegistration() {
   if (linkedVisit) { $("registration").value=linkedVisit.patient_uid; return; }
-  const field = $("registration");
-  try {
-    const data = await api("/api/registration-preview");
-    if (!linkedVisit) field.value = data.registration;
-  } catch {
-    field.value = "";
-    field.placeholder = "Generated when saved";
-  }
+  invoicePatients.syncRegistration();
 }
 function view(name) {
   medicineDrawer.close();
@@ -180,6 +176,7 @@ $("invoice-form").onsubmit = async (e) => {
   const submit=e.target.querySelector('[type=submit]');
   submit.disabled=true;
   try {
+    if(!linkedVisit)Object.assign(payload,invoicePatients.getPayload());
     const address=await chooseInvoiceAddress();
     if(!address)return;
     payload.clinic_address_id=address;
@@ -192,6 +189,7 @@ $("invoice-form").onsubmit = async (e) => {
     fillRegistration();
   } catch (err) {
     $("form-message").textContent = err.message;
+    if(err.matches)invoicePatients.showMatches(err.matches);
   } finally { submit.disabled=false; }
 };
 function paymentStatusControl(r) {
@@ -251,6 +249,7 @@ function resetInvoiceEditor() {
   medicineDrawer.close();
   linkedVisit=null;
   $('invoice-form').reset();
+  invoicePatients.reset();
   for (const name of ['patient_name','age','gender','payment_mode']) $('invoice-form').elements[name].disabled=false;
   $('invoice-opd-notice').hidden=true;
   $('items').replaceChildren(); itemRow(); update();
@@ -262,7 +261,11 @@ $("back-history").onclick = () => {
   view("history");
   list();
 };
-$("print").onclick = () => window.print();
+$("print").onclick = async () => {
+  $('detail-error').textContent='';
+  try { await printPaper($('invoice-paper')); }
+  catch(error) { $('detail-error').textContent=error.message; }
+};
 const ones = [
   "",
   "One",
@@ -354,7 +357,7 @@ function showInvoice(v) {
     hour12: true,
   });
   $("invoice-paper").innerHTML =
-    `<div class="invoice-heading"><div><img class="invoice-logo" src="/logo.png" alt="Yogi Piles &amp; Panchkarma Center" width="80" height="80"><h2>YOGI PILES</h2><strong>& Panchkarma Center</strong><p>${esc(v.clinic_address || CLINIC_ADDRESSES[0].address)}<br>Contact: +91 9453272173, +91 5223649819</p></div><div class="invoice-right"><h2>${v.tax_rate_bps ? "TAX INVOICE" : "INVOICE"}</h2><span class="gst">GSTIN: 09AINPR4695R1ZU</span><p>${esc(v.invoice_number)}</p></div></div>${v.voided_at ? `<div class="void-banner">VOIDED · ${esc(v.void_reason)}</div>` : ""}<div class="patient-box"><div><span>Patient Name</span><b>${esc(v.patient_name)}</b><span>Age / Gender</span><b>${esc(v.age || "—")} Years / ${esc(v.gender || "—")}</b><span>Mode of Payment</span><b>${esc(v.payment_mode)}</b></div><div><span>Reg. No. / UID</span><b>${esc(v.registration || "—")}</b><span>Date & Time</span><b>${esc(date)}</b><span>Status</span><b class="status">${status}</b></div></div><table class="bill-table"><thead><tr><th>S.NO.</th><th>TYPE</th><th>MEDICINE / SERVICE NAME</th><th>QTY</th><th>UNIT PRICE</th><th>AMOUNT</th>${hasMedicines?'<th>MEDICINE TOTAL</th>':''}</tr></thead><tbody>${v.items.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.type)}</td><td>${esc(x.description)}</td><td>${x.quantity}</td><td>${fmt(x.unit_price_paise)}</td><td>${fmt(x.amount_paise)}</td>${hasMedicines?`<td>${x.medicine_id?fmt(x.final_amount_paise):"?"}</td>`:""}</tr>`).join("")}</tbody></table><div class="bill-bottom"><div class="words"><strong>AMOUNT IN WORDS</strong><br>${words(whole) || "Zero"} Indian Rupees${paise ? " and " + words(paise) + " Paise" : ""} Only</div><div class="bill-totals"><div><span>Subtotal:</span><b>${fmt(v.subtotal_paise)}</b></div>${v.opd_visit_id ? `<div><span>Discount (${(v.discount_bps||0)/100}%):</span><b>${fmt(v.discount_paise||0)}</b></div>` : ""}${v.tax_rate_bps ? `<div><span>CGST${hasMedicines?"":` (${(v.tax_rate_bps / 100).toFixed(2)}%)`}:</span><b>${fmt(v.cgst_paise)}</b></div><div><span>SGST${hasMedicines?"":` (${(v.tax_rate_bps / 100).toFixed(2)}%)`}:</span><b>${fmt(v.sgst_paise)}</b></div>` : ""}<div class="final"><span>Grand Total:</span><b>${fmt(v.total_paise)}</b></div><div><span>Amount Received:</span><b>${fmt(v.received_paise)}</b></div><div><span>Balance Due:</span><b>${fmt(v.balance_paise)}</b></div></div></div>${v.payments.length ? `<div class="payment-history"><strong>PAYMENTS RECEIVED AFTER ISSUE</strong>${v.payments.map((p) => `<div>${esc(new Date(p.received_at).toLocaleDateString("en-IN"))} · ${esc(p.mode)} · ${fmt(p.amount_paise)} ${p.note ? "· " + esc(p.note) : ""}</div>`).join("")}</div>` : ""}${v.payment_adjustments?.length ? `<div class="payment-history"><strong>MANUAL PAYMENT STATUS ADJUSTMENTS</strong>${v.payment_adjustments.map(p => `<div>${esc(new Date(p.created_at).toLocaleString("en-IN"))} &middot; Marked ${esc(p.status)} &middot; Adjustment: ${fmt(p.amount_paise)}</div>`).join("")}</div>` : ""}<div class="signatures"><div>Patient / Attendant Signature</div><div>Authorized Signatory / Cashier</div></div><div class="bill-note">* This is a computerized invoice and does not require a physical signature. Thank you for choosing Yogi Piles & Panchkarma Center. Wishing you a speedy recovery.</div><div class="bill-footer"><span>Yogi Piles & Panchkarma Center · Computerized Invoice</span><span>Page 1 of 1</span></div>`;
+    `<div class="invoice-heading"><div><img class="invoice-logo" src="/logo.png" alt="Yogi Piles &amp; Panchkarma Center" width="80" height="80"><h2>YOGI PILES</h2><strong>& Panchkarma Center</strong><p>${esc(v.clinic_address || CLINIC_ADDRESSES[0].address)}<br>Contact: +91 9453272173, +91 5223649819</p></div><div class="invoice-right"><h2>${v.tax_rate_bps ? "TAX INVOICE" : "INVOICE"}</h2><span class="gst">GSTIN: 09AINPR4695R1ZU</span><p class="invoice-identifiers"><span>UHID Number: <strong>${esc(v.registration || "—")}</strong></span><br><span>${esc(v.invoice_number)}</span></p></div></div>${v.voided_at ? `<div class="void-banner">VOIDED · ${esc(v.void_reason)}</div>` : ""}<div class="patient-box"><div><span>Patient Name</span><b>${esc(v.patient_name)}</b><span>Age / Gender</span><b>${esc(v.age || "—")} Years / ${esc(v.gender || "—")}</b><span>Mode of Payment</span><b>${esc(v.payment_mode)}</b>${v.patient_mobile?`<span>Mobile Number</span><b>${esc(v.patient_mobile)}</b>`:""}</div><div><span>UHID Number</span><b>${esc(v.registration || "—")}</b><span>Date & Time</span><b>${esc(date)}</b><span>Status</span><b class="status">${status}</b></div></div>${v.patient_address?`<div class="invoice-patient-address"><span>Patient address</span><b>${esc(v.patient_address)}</b></div>`:""}<table class="bill-table"><thead><tr><th>S.NO.</th><th>TYPE</th><th>MEDICINE / SERVICE NAME</th><th>QTY</th><th>UNIT PRICE</th><th>AMOUNT</th>${hasMedicines?'<th>MEDICINE TOTAL</th>':''}</tr></thead><tbody>${v.items.map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.type)}</td><td>${esc(x.description)}</td><td>${x.quantity}</td><td>${fmt(x.unit_price_paise)}</td><td>${fmt(x.amount_paise)}</td>${hasMedicines?`<td>${x.medicine_id?fmt(x.final_amount_paise):"?"}</td>`:""}</tr>`).join("")}</tbody></table><div class="bill-bottom"><div class="words"><strong>AMOUNT IN WORDS</strong><br>${words(whole) || "Zero"} Indian Rupees${paise ? " and " + words(paise) + " Paise" : ""} Only</div><div class="bill-totals"><div><span>Subtotal:</span><b>${fmt(v.subtotal_paise)}</b></div>${v.opd_visit_id ? `<div><span>Discount (${(v.discount_bps||0)/100}%):</span><b>${fmt(v.discount_paise||0)}</b></div>` : ""}${v.tax_rate_bps ? `<div><span>CGST${hasMedicines?"":` (${(v.tax_rate_bps / 100).toFixed(2)}%)`}:</span><b>${fmt(v.cgst_paise)}</b></div><div><span>SGST${hasMedicines?"":` (${(v.tax_rate_bps / 100).toFixed(2)}%)`}:</span><b>${fmt(v.sgst_paise)}</b></div>` : ""}<div class="final"><span>Grand Total:</span><b>${fmt(v.total_paise)}</b></div><div><span>Amount Received:</span><b>${fmt(v.received_paise)}</b></div><div><span>Balance Due:</span><b>${fmt(v.balance_paise)}</b></div></div></div>${v.payments.length ? `<div class="payment-history"><strong>PAYMENTS RECEIVED AFTER ISSUE</strong>${v.payments.map((p) => `<div>${esc(new Date(p.received_at).toLocaleDateString("en-IN"))} · ${esc(p.mode)} · ${fmt(p.amount_paise)} ${p.note ? "· " + esc(p.note) : ""}</div>`).join("")}</div>` : ""}${v.payment_adjustments?.length ? `<div class="payment-history"><strong>MANUAL PAYMENT STATUS ADJUSTMENTS</strong>${v.payment_adjustments.map(p => `<div>${esc(new Date(p.created_at).toLocaleString("en-IN"))} &middot; Marked ${esc(p.status)} &middot; Adjustment: ${fmt(p.amount_paise)}</div>`).join("")}</div>` : ""}<div class="signatures"><div>Patient / Attendant Signature</div><div>Authorized Signatory / Cashier</div></div><div class="bill-note">* This is a computerized invoice and does not require a physical signature. Thank you for choosing Yogi Piles & Panchkarma Center. Wishing you a speedy recovery.</div><div class="bill-footer"><span>Yogi Piles & Panchkarma Center · Computerized Invoice</span><span>Page 1 of 1</span></div>`;
   view("detail");
   if(v.opd_number) $('invoice-paper').querySelector('.invoice-right').insertAdjacentHTML('beforeend',`<p>OPD: ${esc(v.opd_number)}</p>`);
   window.scrollTo(0, 0);
@@ -368,7 +371,7 @@ api("/api/me")
   .catch(() => {});
 
 initOpd({$,api,esc,fmt,view,showInvoice,words,prepareInvoice(visit) {
-  resetInvoiceEditor(); linkedVisit=visit;
+  resetInvoiceEditor(); linkedVisit=visit;invoicePatients.lockToVisit(visit);
   const form=$('invoice-form');
   for (const [name,value] of Object.entries({patient_name:visit.patient_name,age:visit.age,gender:visit.gender,payment_mode:visit.payment_mode||'UNPAID'})) {
     form.elements[name].value=value; form.elements[name].disabled=true;
