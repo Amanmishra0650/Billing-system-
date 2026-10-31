@@ -10,6 +10,18 @@ import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {migrateUhidCounter} from '../uhid-counter-migration.mjs';
 
+test('UHID counter starts at 2011161 even with a legacy sequence starting at one',async()=>{
+  const db=await createDatabase({connectionString:'',dataDir:'memory://',initialize:false});
+  try{
+    await db.exec(await readFile(new URL('../schema.sql',import.meta.url),'utf8'));
+    await db.query("SELECT setval('patient_uid_seq',1,false)");
+    assert.equal((await migrateUhidCounter(db)).nextUhid,2011162);
+    assert.equal((await db.query('SELECT last_value FROM patient_uhid_counter WHERE singleton')).rows[0].last_value,2011161);
+    assert.equal((await createPatient(db,{name:'Numeric UHID patient'})).patient_uid,'2011162');
+    assert.equal((await migrateUhidCounter(db)).nextUhid,2011163);
+  }finally{await db.close();}
+});
+
 test('UHID allocation rolls back failed registrations without consuming a number',async()=>{
   const db=await createDatabase({connectionString:'',dataDir:'memory://'});
   try{

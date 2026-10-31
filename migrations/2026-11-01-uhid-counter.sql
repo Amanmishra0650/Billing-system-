@@ -12,5 +12,6 @@ WITH issued AS (
   ) AS high_water
 )
 INSERT INTO patient_uhid_counter(singleton,last_value)
-SELECT true,GREATEST(high_water,(SELECT CASE WHEN is_called THEN last_value ELSE last_value-1 END FROM patient_uid_seq)) FROM issued
+-- Increment before assignment: a fresh counter stores 2011161 to issue 2011162.
+SELECT true,GREATEST(2011161,high_water,(SELECT CASE WHEN is_called THEN last_value ELSE last_value-1 END FROM patient_uid_seq)) FROM issued
 ON CONFLICT(singleton) DO UPDATE SET last_value=GREATEST(patient_uhid_counter.last_value,(SELECT high_water FROM issued));
